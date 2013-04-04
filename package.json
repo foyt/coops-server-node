@@ -1,0 +1,20 @@
+{
+  "author": "Antti Leppä (Foyt)",
+  "name": "coops-node-server",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/anttileppa/coops-node-server.git"
+  },
+  "engines": {
+    "node": ">0.4.0"
+  },
+  "dependencies": {
+    "express": "3.x",
+    "mongodb": "1.2.12",
+    "mongoose": "3.5.6",
+    "ws": "0.4.2",
+    "coops-node": "1.0.0-draft1",
+    "googlediff": "0.1.0"
+  }
+}
