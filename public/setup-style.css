@@ -1,0 +1,162 @@
+body {
+  font-family: Gadget;
+  font-variant: small-caps;
+}
+
+h2 {
+  color: #000;
+  font-weight: normal;
+}
+
+.container {
+  border-top: 1px solid #fff;
+  border-bottom: 1px solid #fff;
+  position: absolute;
+  top: 22px;
+  bottom: 22px;
+  left: 0px;
+  right: 0px;
+  background: rgb(255, 255, 255); /* Old browsers */
+  background: -moz-linear-gradient(top, rgba(255, 255, 255, 1) 0%,
+    rgba(241, 241, 241, 1) 23%, rgba(225, 225, 225, 1) 79%,
+    rgba(246, 246, 246, 1) 100%); /* FF3.6+ */
+  background: -webkit-gradient(linear, left top, left bottom, color-stop(0%, rgba(255,
+    255, 255, 1)), color-stop(23%, rgba(241, 241, 241, 1)),
+    color-stop(79%, rgba(225, 225, 225, 1)),
+    color-stop(100%, rgba(246, 246, 246, 1))); /* Chrome,Safari4+ */
+  background: -webkit-linear-gradient(top, rgba(255, 255, 255, 1) 0%,
+    rgba(241, 241, 241, 1) 23%, rgba(225, 225, 225, 1) 79%,
+    rgba(246, 246, 246, 1) 100%); /* Chrome10+,Safari5.1+ */
+  background: -o-linear-gradient(top, rgba(255, 255, 255, 1) 0%,
+    rgba(241, 241, 241, 1) 23%, rgba(225, 225, 225, 1) 79%,
+    rgba(246, 246, 246, 1) 100%); /* Opera 11.10+ */
+  background: -ms-linear-gradient(top, rgba(255, 255, 255, 1) 0%,
+    rgba(241, 241, 241, 1) 23%, rgba(225, 225, 225, 1) 79%,
+    rgba(246, 246, 246, 1) 100%); /* IE10+ */
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%,
+    rgba(241, 241, 241, 1) 23%, rgba(225, 225, 225, 1) 79%,
+    rgba(246, 246, 246, 1) 100%); /* W3C */
+  filter: progid:DXImageTransform.Microsoft.gradient(   startColorstr='#ffffff',
+    endColorstr='#f6f6f6', GradientType=0); /* IE6-9 */
+}
+
+.content {
+  width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+form > div {
+  min-height: 25px;
+}
+
+form > div > label {
+    display: inline-block;
+    min-width: 150px;
+}
+
+form > div > input[type="text"] {
+  min-width: 250px;   
+}
+
+form input[type="submit"] {
+  margin-top: 8px;
+}
+
+.list, form {
+  border-top: 1px dotted #ddd;
+  border-bottom: 1px dotted #ddd;
+  margin-top: 16px;
+  padding-top: 16px;
+  padding-bottom: 16px;
+  margin-right: 200px;
+}
+
+.list-item {
+  margin-top: 4px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+.list-item:hover {
+  background-color: #666;   
+  padding-left: 4px;
+  margin-left: -4px;
+  padding-right: 4px;
+  margin-right: -4px;
+  color: #fff;
+}
+
+.list-action {
+  float: right;
+  margin-right: 4px;
+  color: #000;
+}
+
+.list-item:hover .list-action {
+  color: #fff;
+}
+
+.view-image {
+  float: right;
+}
+
+.info-text {
+  color: #444;
+  font-style: italic;
+  margin-right: 200px;
+}
+
+.login-button a {
+  text-decoration: none;
+  color: #000;
+}
+
+.login-button a span {
+  font-size: 20px;
+  display: inline-block;
+  margin-left: 8px;
+  margin-top: 24px;
+  vertical-align: top;
+}
+
+.header {
+  position: absolute;
+  left: 0px;
+  right: 0px;
+  top: 0px;
+  padding: 4px;
+  color: rgba(0, 0, 0, 0.8);
+  background: rgba(192, 192, 192, 0.2);
+  font-size: 14px;
+}
+
+.footer {
+  position: absolute;
+  left: 0px;
+  right: 0px;
+  bottom: 0px;
+  padding: 4px;
+  color: rgba(0, 0, 0, 0.8);
+  background: rgba(192, 192, 192, 0.2);
+  font-size: 14px;
+}
+
+.footer-left {
+  background-image: url('/gfx/github.png');
+  background-repeat: no-repeat;
+  background-position: left center;
+  color: #000;
+  float: left;
+}
+
+.footer-left a {
+  margin-left: 20px;
+  color: #000;
+}
+
+.footer-right {
+  float: right;
+}
