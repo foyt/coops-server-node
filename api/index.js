@@ -1,5 +1,7 @@
 (function() {
   var db = require("../db");
+  var utils = require("../utils");
+  var _ = require('underscore');
   
   var events = require('events');
   var api = require('./api.js')
@@ -39,58 +41,48 @@
     }
   });
   
+  // Exports
+  
   module.exports.createUser = function (req, res) {
-    // TODO: this should be converted into client auth.
-    var clientId = req.body['clientId'];
-    var clientSecret = req.body['clientSecret'];
     var name = req.body['name'];
-
-    db.model.Client.findOne({clientId: clientId, clientSecret: clientSecret}, function (err, client) {
+    var client = req.user;
+    
+    var user = new db.model.User();
+    user.name = name;
+    user.save(function (err, newUser) {
       if (err) {
         res.send(err, 500);
       } else {
-        if (!client) {
-          res.send("Unauthorized", 401);
-        } else {
-          var user = new db.model.User();
-          user.name = name;
-          user.save(function (err, newUser) {
-            if (err) {
-              res.send(err, 500);
-            } else {
-              var expireTime = 1000 * 60 * 60 * 24;
-              var accessToken = new db.model.AccessToken();
-              accessToken.token = utils.uid(256);
-              accessToken.refreshToken = utils.uid(256);
-              accessToken.userId = user._id;
-              accessToken.clientId = client._id;
-              accessToken.expires = expireTime + new Date().getTime();
-              
-              accessToken.save(function (err, newAccessToken) {
-                var event = new ApiExtensionEvent(req, {
-                  "user_id": newAccessToken.userId,
-                  "access_token": {
-                    "access_token": newAccessToken.token,
-                    "token_type":"Bearer",
-                    "expires_in":  new Date().getTime() - newAccessToken.expires,
-                    "refresh_token": newAccessToken.refreshToken
-                  } 
-                });
-                      
-                extensionEventEmitter.emit("createUser", event);
-                
-                api.sendResponse(res,
-                  api.createResponseBuilder()
-                    .setStatus(api.STATUS_OK)
-                    .setResponse(event.getData())
-                    .build()
-                );
-              });
-            }
+        var expireTime = 1000 * 60 * 60 * 24;
+        var accessToken = new db.model.AccessToken();
+        accessToken.token = utils.uid(256);
+        accessToken.refreshToken = utils.uid(256);
+        accessToken.userId = user._id;
+        accessToken.clientId = client._id;
+        accessToken.expires = expireTime + new Date().getTime();
+        
+        accessToken.save(function (err, newAccessToken) {
+          var event = new ApiExtensionEvent(req, {
+            "user_id": newAccessToken.userId,
+            "access_token": {
+              "access_token": newAccessToken.token,
+              "token_type":"Bearer",
+              "expires_in":  newAccessToken.expires - new Date().getTime(),
+              "refresh_token": newAccessToken.refreshToken
+            } 
           });
-        }
-      } 
-    }); 
+                
+          extensionEventEmitter.emit("createUser", event);
+          
+          api.sendResponse(res,
+            api.createResponseBuilder()
+              .setStatus(api.STATUS_OK)
+              .setResponse(event.getData())
+              .build()
+          );
+        });
+      }
+    });   
   };
 
   module.exports.getUsers = function(req, res) {
@@ -138,7 +130,7 @@
   
   module.exports.createUserFile = function(req, res) {
     var userId = req.params.userid;
-    var name = req.query['name'];
+    var name = req.body['name'];
     var content = '<p>Test</p>';
     var contentType = 'text/html';
     // TODO: name => post parameter
@@ -178,23 +170,39 @@
   
   module.exports.getUserFiles = function(req, res) {
     var userId = req.params.userid;
-    
     db.model.FileUser.find({ userId: userId }, 
       function (err, fileUsers) {
         if (err) {
           res.send(err, 500);
         } else {
-          var event = new ApiExtensionEvent(req, {
-            fileIds: _.pluck(fileUsers, "fileId")
+          var roles = {};
+          fileUsers.forEach(function (fileUser) {
+            roles[fileUser.fileId] = fileUser.role;
           });
 
-          extensionEventEmitter.emit("listUserFiles", event);
-          api.sendResponse(res,
-            api.createResponseBuilder()
-              .setStatus(api.STATUS_OK)
-              .setResponse(event.getData())
-              .build()
-          );
+          db.model.File.find({ '_id': { $in: _.pluck(fileUsers, "fileId") } }, function (err, files) {
+            var eventFiles = new Array();
+            files.forEach(function (file) {
+              eventFiles.push({
+                id: file._id,
+                name: file.name,
+                revisionNumber: file.revisionNumber,
+                role: roles[file._id]
+              });
+            });
+
+            var event = new ApiExtensionEvent(req, {
+              files: eventFiles
+            });
+
+            extensionEventEmitter.emit("listUserFiles", event);
+            api.sendResponse(res,
+              api.createResponseBuilder()
+                .setStatus(api.STATUS_OK)
+                .setResponse(event.getData())
+                .build()
+            ); 
+          });
         }
       }
     );
@@ -203,7 +211,7 @@
   module.exports.joinUserFile = function(req, res) {
     var userId = req.params.userid;
     var fileId = req.params.fileid;
-
+    
     // Algorithms supported by the client. 
     var clientAlgorithms = req.query['algorithm'];
     if (!(clientAlgorithms instanceof Array)) {
@@ -251,9 +259,13 @@
           if (err) {
             res.send(err, 500);
           } else {
+            var token = utils.uid(64);
+            
             var event = new ApiExtensionEvent(req, {
               sessionId: session._id,
-              extensions: api.getExtensions()
+              extensions: api.getExtensions(),
+              fileId: fileId,
+              webSocketUrl: 'ws://localhost:3000/1/users/' + userId + '/files/' + fileId + '/websocket/' + token
             });
               
             extensionEventEmitter.emit("fileJoin", event);
@@ -287,6 +299,7 @@
             } else {
               var event = new ApiExtensionEvent(req, {
                 fileId: fileId,
+                revisionNumber: file.revisionNumber,
                 name: file.name,
                 content: fileContent.content,
                 contentType: fileContent.contentType

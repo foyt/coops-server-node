@@ -1,33 +1,35 @@
 (function() {
+  
+  var db = require('./db');
 
   function checkFileRole(req, res, roles, next) {
     if (!req.user) {
       res.send("Unauthorized", 401);
-    }
-    
-    if (req.user._id == req.params.userid) {
-      next();
     } else {
-      res.send("Forbidden", 403);
-    }
-
-    var fileId = req.params.fileid;
-    
-    db.model.FileUser.findOne({fileId: fileId, userId: userId}, function (err, fileUser) {
-      if (err) {
-        res.send("Internal Server Error", 500);
-      }
-      
-      if (!fileUser) {
+      if (req.user._id != req.params.userid) {
         res.send("Forbidden", 403);
-      }
-      
-      if (roles.indexOf(fileUser.role) == -1) {
-        res.send("Forbidden", 403);    
       } else {
-        next();
+  
+        var fileId = req.params.fileid;
+        
+        db.model.FileUser.findOne({fileId: fileId, userId: req.user._id}, function (err, fileUser) {
+          if (err) {
+            console.error(err);
+            res.send("Internal Server Error", 500);
+          }
+          
+          if (!fileUser) {
+            res.send("Forbidden", 403);
+          } else {
+            if (roles.indexOf(fileUser.role) == -1) {
+              res.send("Forbidden", 403);    
+            } else {
+              next();
+            }
+          }
+        });  
       }
-    });  
+    }
   }
   
   module.exports.can = function (action) {

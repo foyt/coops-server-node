@@ -1,11 +1,11 @@
 (function() {
-  
   var diffMatchPatchMod = require('googlediff');
   var diffMatchPatch = new diffMatchPatchMod();
   
   var WebSocketServer = require('ws').Server;
   var events = require('events');
-  var dao = require('./dao.js');
+  var db = require('./db');
+  
   var connectedClients = new Array();
   
   var Client = function (clientId, fileId, webSocket) {
@@ -133,8 +133,6 @@
     },
     _acceptPatch: {
       value: function(revisionNumber) {
-        console.log("patchAccepted");
-      
         this._webSocket.send(JSON.stringify({
           type: 'patchAccepted',
           revisionNumber: revisionNumber
@@ -143,8 +141,6 @@
     },
     _rejectPatch: {
       value: function(revisionNumber, reason) {
-        console.log("patchRejected: " + reason);
-
         this._webSocket.send(JSON.stringify({
           type: 'patchRejected',
           revisionNumber: revisionNumber,
@@ -156,11 +152,16 @@
     _createRevision: {
       value: function (file, revisionNumber, patch, callback) {
         // New revision
-        dao.createFileRevision(file._id, revisionNumber, patch, function (fileRevision) {
-          // Update document revision
-          dao.updateFileRevisionNumber(file, revisionNumber, function (updatedFile) {
-            callback(fileRevision, updatedFile);
-          });
+        new db.model.FileRevision({ fileId: file._id, revisionNumber: revisionNumber, patch: patch }).save(function (err, fileRevision) {
+          if (err) {
+            callback(err, null);
+          } else {
+            // Update document revision
+            file.revisionNumber = revisionNumber;
+            file.save(function (err, file) {
+              callback(err, fileRevision);
+            });
+          }
         });
       }
     },
@@ -169,21 +170,32 @@
       value: function (file, patchRevision, patch) {
         var _this = this;
         
-        dao.getFileContent(file._id, function (fileContent) {
-          console.log("Applying patch...");
-        
+        db.model.FileContent.findOne({ 'fileId': file._id}, function (err, fileContent) {
           var patchResult = _this._applyPatch(patch, fileContent.content);
           if (patchResult.applied) {
             // Patch applied succesfully
-            _this._createRevision(file, patchRevision + 1, patch, function (fileRevision, updatedFile) {
-              dao.updateFileContentContent(fileContent, patchResult.patchedText, function (updateFileContent) {
-                _this._acceptPatch(updatedFile.revisionNumber);
-                _this._sendRevisionToOthers(fileRevision);
-              });  
+            _this._createRevision(file, patchRevision + 1, patch, function (err, fileRevision) {
+              if (err) {
+                fileRevision.remove(function () {
+                  _this._rejectPatch(patchRevision, "Failed to create revision: " + err);
+                });
+              } else {
+                fileContent.content = patchResult.patchedText;
+                fileContent.save(function (err, fileContent) {
+                  if (err) {
+                    fileRevision.remove(function () {
+                      _this._rejectPatch(patchRevision, "Failed to persist content: " + err);
+                    });
+                  } else {
+                    _this._acceptPatch(fileRevision.revisionNumber);
+                    _this._sendRevisionToOthers(fileRevision);
+                  }
+                });
+              }
             });
           } else {
             // Patching failed, so we reject the patch
-            _this._rejectPatch(patchRevision, "PATCH_FAILED");
+            _this._rejectPatch(patchRevision, "Failed to apply patch");
           }
         });
       }
@@ -191,20 +203,24 @@
     
     _onReceivePatch: {
       value: function (event) {
-	    var patch = event.patch;
-	    var patchRevision = event.revisionNumber;
-   
-        var _this = this;
-        dao.getFile(this._fileId, function (file) {
-          if (file.revisionNumber == patchRevision) {
-            // Patch is to this revision so we can accept it
-            _this._patchFile(file, patchRevision, patch);          
-          } else {
-            // Patch is not to this revision, so we reject it
-            _this._rejectPatch(patchRevision, "OUT_OF_SYNC");
-          }
-        });
-	  }
+  	    var patch = event.patch;
+  	    var patchRevision = event.revisionNumber;
+  	    
+  	    var _this = this;
+  	    db.model.File.findOne({ '_id': this._fileId }, function (err, file) {
+  	      if (err) {
+  	        _this._rejectPatch(patchRevision, "Could not find file: " + err);
+  	      } else {
+  	        if (file.revisionNumber == patchRevision) {
+  	          // Patch is to this revision so we can accept it
+  	          _this._patchFile(file, patchRevision, patch);          
+  	        } else {
+  	          // Patch is not to this revision, so we reject it
+  	          _this._rejectPatch(patchRevision, "Out of sync");
+  	        }
+  	      }
+  	    });
+  	  }
     },
     
     _onReceiveSelection: {
@@ -230,8 +246,12 @@
       });
 
       webSocketServer.on('connection', function(webSocket) {
-        // TODO: from session
-        var fileId = '513b767427c5726a04000002';
+        var url = webSocket.upgradeReq.url;
+        var slices = url.split('/');
+        var userId = slices[3];
+        var fileId = slices[5];
+        var token = slices[7];
+        
         var clientId = (clientIdCounter++);
       
         var client = new Client(clientId, fileId, webSocket);
@@ -250,7 +270,9 @@
         
         console.log("Client connected. Client count " + connectedClients.length);
       });
+      
+      console.log("WebSocketServer listening");
     }
   };
-  
+
 }).call(this);

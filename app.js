@@ -2,18 +2,22 @@
  * Module dependencies.
  */
 var express = require('express');
+var http = require('http');
 var passport = require('passport');
 var util = require('util');
 var utils = require('./utils');
 var views = require("./views");
 var api = require("./api");
 var roles = require('./roles.js');
-require('./auth');
+var auth = require('./auth');
+var websocket = require('./websocket.js');
+var port = 3000;
 
 /**
  * Express setup
  */
 var app = express();
+var server = http.createServer(app);
 
 app.set('views', __dirname + '/views')
 app.set('view engine', 'jade');
@@ -26,6 +30,8 @@ app.use(passport.initialize());
 app.use(app.router);
 app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
 app.use(roles.can);
+
+websocket.initialize(server);
 
 /**
  * Lists all users. 
@@ -84,4 +90,4 @@ app.get('/setup/edit-client', views.setupEditClient);
 app.post('/setup/add-client', views.setupCreateClient); 
 app.post('/setup/edit-client', views.setupModifyClient); 
 
-app.listen(3000);
+server.listen(port);

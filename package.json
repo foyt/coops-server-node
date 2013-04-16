@@ -15,7 +15,7 @@
     "oauth2orize": "0.x.x",
     "jade": "*",
     "underscore": "*",
-    "ws": "0.4.2",
+    "ws": "*",
     "googlediff": "0.1.0"
   }
 }
