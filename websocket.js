@@ -1,7 +1,7 @@
 (function() {
   var diffMatchPatchMod = require('googlediff');
   var diffMatchPatch = new diffMatchPatchMod();
-  
+  var crc = require('crc');
   var WebSocketServer = require('ws').Server;
   var events = require('events');
   var db = require('./db');
@@ -50,7 +50,8 @@
         this._webSocket.send(JSON.stringify({
           type: 'patch',
           patch: fileRevision.patch,
-          revisionNumber: fileRevision.revisionNumber
+          revisionNumber: fileRevision.revisionNumber,
+          checksum: fileRevision.checksum
         }));
       }
     },
@@ -150,9 +151,9 @@
     },
     
     _createRevision: {
-      value: function (file, revisionNumber, patch, callback) {
+      value: function (file, revisionNumber, patch, checksum, callback) {
         // New revision
-        new db.model.FileRevision({ fileId: file._id, revisionNumber: revisionNumber, patch: patch }).save(function (err, fileRevision) {
+        new db.model.FileRevision({ fileId: file._id, revisionNumber: revisionNumber, patch: patch, checksum: checksum }).save(function (err, fileRevision) {
           if (err) {
             callback(err, null);
           } else {
@@ -173,8 +174,9 @@
         db.model.FileContent.findOne({ 'fileId': file._id}, function (err, fileContent) {
           var patchResult = _this._applyPatch(patch, fileContent.content);
           if (patchResult.applied) {
+            var checksum = crc.crc32(patchResult.patchedText);
             // Patch applied succesfully
-            _this._createRevision(file, patchRevision + 1, patch, function (err, fileRevision) {
+            _this._createRevision(file, patchRevision + 1, patch, checksum, function (err, fileRevision) {
               if (err) {
                 fileRevision.remove(function () {
                   _this._rejectPatch(patchRevision, "Failed to create revision: " + err);

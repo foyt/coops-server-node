@@ -54,7 +54,8 @@
   var FileRevisionSchema = mongoose.Schema({
     fileId: mongoose.Schema.Types.ObjectId,
     revisionNumber: Number,
-    patch: String
+    patch: String,
+    checksum: Number
   });
   
   /* Session */
