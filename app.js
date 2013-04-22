@@ -11,7 +11,7 @@ var api = require("./api");
 var roles = require('./roles.js');
 var auth = require('./auth');
 var websocket = require('./websocket.js');
-var port = 3000;
+var config = require('./config.js');
 
 /**
  * Express setup
@@ -83,6 +83,8 @@ app.patch('/1/users/:userid/files/:fileid', [ passport.authenticate('bearer', { 
 
 /* <-- CoOPS */
 
+app.get('/', views.index);
+
 // Configuration views
 app.get('/setup/clients', views.setupClients); 
 app.get('/setup/add-client', views.setupAddClient); 
@@ -90,4 +92,4 @@ app.get('/setup/edit-client', views.setupEditClient);
 app.post('/setup/add-client', views.setupCreateClient); 
 app.post('/setup/edit-client', views.setupModifyClient); 
 
-server.listen(port);
+server.listen(config.port);

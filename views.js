@@ -1,6 +1,10 @@
 var db = require("./db");
 var utils = require('./utils');
 
+exports.index = function (req, res) {
+  res.render('index');
+};
+
 exports.setupClients = function (req, res) {
   db.model.Client.find(function (err, clients) {
     if (err) {
