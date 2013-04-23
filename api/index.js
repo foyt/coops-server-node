@@ -260,12 +260,13 @@
             res.send(err, 500);
           } else {
             var token = utils.uid(64);
+            var webSocketUrl = 'ws://' + req.get('host') + '/1/users/' + userId + '/files/' + fileId + '/websocket/' + token
             
             var event = new ApiExtensionEvent(req, {
               sessionId: session._id,
               extensions: api.getExtensions(),
               fileId: fileId,
-              webSocketUrl: 'ws://localhost:3000/1/users/' + userId + '/files/' + fileId + '/websocket/' + token
+              webSocketUrl: webSocketUrl
             });
               
             extensionEventEmitter.emit("fileJoin", event);
