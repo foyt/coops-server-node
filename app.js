@@ -11,7 +11,6 @@ var api = require("./api");
 var roles = require('./roles.js');
 var auth = require('./auth');
 var websocket = require('./websocket.js');
-var config = require('./config.js');
 
 /**
  * Express setup
@@ -86,10 +85,11 @@ app.patch('/1/users/:userid/files/:fileid', [ passport.authenticate('bearer', { 
 app.get('/', views.index);
 
 // Configuration views
-app.get('/setup/clients', views.setupClients); 
-app.get('/setup/add-client', views.setupAddClient); 
-app.get('/setup/edit-client', views.setupEditClient); 
-app.post('/setup/add-client', views.setupCreateClient); 
-app.post('/setup/edit-client', views.setupModifyClient); 
 
-server.listen(config.port);
+app.get('/setup/clients', [ passport.authenticate('admin', { session: false }) ], views.setupClients); 
+app.get('/setup/add-client', [ passport.authenticate('admin', { session: false }) ], views.setupAddClient); 
+app.get('/setup/edit-client', [ passport.authenticate('admin', { session: false }) ], views.setupEditClient); 
+app.post('/setup/add-client', [ passport.authenticate('admin', { session: false }) ], views.setupCreateClient); 
+app.post('/setup/edit-client', [ passport.authenticate('admin', { session: false }) ], views.setupModifyClient); 
+
+server.listen(process.env.PORT_COOPS_SERVER || process.env.PORT ||8080);

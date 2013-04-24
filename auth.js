@@ -6,6 +6,7 @@ var BearerStrategy = require('passport-http-bearer').Strategy;
 var BasicStrategy = require('passport-http').BasicStrategy;
 var ClientPasswordStrategy = require('passport-oauth2-client-password').Strategy;
 var db = require('./db');
+var util = require('util');
 
 /**
  * BearerStrategy
@@ -79,4 +80,29 @@ passport.use(new ClientPasswordStrategy(function(clientId, clientSecret, done) {
 
     return done(null, client);
   });
+}));
+
+function AdminStrategy(options, verify) {
+  if (typeof options == 'function') {
+    verify = options;
+    options = {};
+  }
+  if (!verify) throw new Error('HTTP Basic authentication strategy requires a verify function');
+  
+  passport.Strategy.call(this);
+  this.name = 'admin';
+  this._verify = verify;
+  this._realm = 'Admins';
+};
+
+util.inherits(AdminStrategy, BasicStrategy);
+
+passport.use(new AdminStrategy(function(username, password, done) {
+  if ((process.env.COOPS_ADMIN_USERNAME == username) && (process.env.COOPS_ADMIN_PASSWORD == password)) {
+    return done(null, {
+      user: 'admin'
+    });
+  } else {
+    return done(null, false);
+  }
 }));
