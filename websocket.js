@@ -47,6 +47,9 @@
     },
     sendRevision: {
       value: function(fileRevision) {
+  	    
+  	    console.log("Sending revision");
+  	    
         this._webSocket.send(JSON.stringify({
           type: 'patch',
           patch: fileRevision.patch,
@@ -134,6 +137,9 @@
     },
     _acceptPatch: {
       value: function(revisionNumber) {
+
+  	    console.log("Accepting patch");
+
         this._webSocket.send(JSON.stringify({
           type: 'patchAccepted',
           revisionNumber: revisionNumber
@@ -142,6 +148,9 @@
     },
     _rejectPatch: {
       value: function(revisionNumber, reason) {
+  	    
+  	    console.log("Rejecting patch");
+  	    
         this._webSocket.send(JSON.stringify({
           type: 'patchRejected',
           revisionNumber: revisionNumber,
@@ -207,6 +216,8 @@
       value: function (event) {
   	    var patch = event.patch;
   	    var patchRevision = event.revisionNumber;
+  	    
+  	    console.log("Patch received");
   	    
   	    var _this = this;
   	    db.model.File.findOne({ '_id': this._fileId }, function (err, file) {
