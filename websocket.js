@@ -117,6 +117,8 @@
         // flags.binary will be set if a binary data is received
         // flags.masked will be set if the data was masked
         
+        console.log("Received websocket message");
+        
         var json = JSON.parse(data);
         
         switch (json.type) {
@@ -257,14 +259,13 @@
       var webSocketServer = new WebSocketServer({
         server: server
       });
-
+      
       webSocketServer.on('connection', function(webSocket) {
         var url = webSocket.upgradeReq.url;
         var slices = url.split('/');
         var userId = slices[3];
         var fileId = slices[5];
         var token = slices[7];
-        
         var clientId = (clientIdCounter++);
       
         var client = new Client(clientId, fileId, webSocket);
@@ -282,6 +283,9 @@
         connectedClients.push(client);
         
         console.log("Client connected. Client count " + connectedClients.length);
+        console.log("  fileId:" + fileId); 
+        console.log("  userId:" + userId); 
+        console.log("  clientId:" + clientId); 
       });
       
       console.log("WebSocketServer listening");
