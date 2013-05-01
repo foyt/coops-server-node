@@ -268,11 +268,11 @@
               fileId: fileId
             };
             
-            if (process.env.COOPS_INSECURE_PORT) {
-              eventData.insecureWebSocketUrl = 'ws://' + host + path;
+            if (process.env.COOPS_UNSECURE_WEBSOCKET == "true") {
+              eventData.unsecureWebSocketUrl = 'ws://' + host + path;
             }
 
-            if (process.env.COOPS_SECURE_PORT && process.env.COOPS_SECURE_CERT && process.env.COOPS_SECURE_CERT_KEY) {
+            if (process.env.COOPS_SECURE_WEBSOCKET == "true") {
               eventData.secureWebSocketUrl = 'wss://' + host + path;
             }
               
