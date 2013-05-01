@@ -1,4 +1,5 @@
 (function() {
+
   var diffMatchPatchMod = require('googlediff');
   var diffMatchPatch = new diffMatchPatchMod();
   var crc = require('crc');
@@ -253,42 +254,56 @@
   });
 
   var clientIdCounter = new Date().getTime();
+  
+  function onWebSocketServerConnection(webSocket) {
+    var url = webSocket.upgradeReq.url;
+    var slices = url.split('/');
+    var userId = slices[3];
+    var fileId = slices[5];
+    var token = slices[7];
+    var clientId = (clientIdCounter++);
+  
+    var client = new Client(clientId, fileId, webSocket);
+    webSocket.on('close', function() {
+      for (var i = connectedClients.length - 1; i >= 0; i--) {
+        if (connectedClients[i] === client) {
+          connectedClients.splice(i, 1);
+          break;
+        } 
+      }
+
+      client.deinitialize();
+    });
+    
+    connectedClients.push(client);
+    
+    console.log("Client connected. Client count " + connectedClients.length);
+    console.log("  fileId:" + fileId); 
+    console.log("  userId:" + userId); 
+    console.log("  clientId:" + clientId);
+  };
    
   module.exports = {
-    initialize: function(server) {
-      var webSocketServer = new WebSocketServer({
-        server: server
-      });
-      
-      webSocketServer.on('connection', function(webSocket) {
-        var url = webSocket.upgradeReq.url;
-        var slices = url.split('/');
-        var userId = slices[3];
-        var fileId = slices[5];
-        var token = slices[7];
-        var clientId = (clientIdCounter++);
-      
-        var client = new Client(clientId, fileId, webSocket);
-        webSocket.on('close', function() {
-          for (var i = connectedClients.length - 1; i >= 0; i--) {
-            if (connectedClients[i] === client) {
-              connectedClients.splice(i, 1);
-              break;
-            } 
-          }
-
-          client.deinitialize();
+    initialize: function(unsecureServer, secureServer) {
+      if (unsecureServer) {
+        var unsecureWebSocketServer = new WebSocketServer({
+           server: unsecureServer
         });
         
-        connectedClients.push(client);
+        unsecureWebSocketServer.on('connection', onWebSocketServerConnection);
         
-        console.log("Client connected. Client count " + connectedClients.length);
-        console.log("  fileId:" + fileId); 
-        console.log("  userId:" + userId); 
-        console.log("  clientId:" + clientId); 
-      });
+        console.log("Unsecure WebSocketServer listening");
+      }
       
-      console.log("WebSocketServer listening");
+      if (secureServer) {
+        var secureWebSocketServer = new WebSocketServer({
+           server: secureServer
+        });
+        
+        secureWebSocketServer.on('connection', onWebSocketServerConnection);
+        
+        console.log("Secure WebSocketServer listening");
+      }
     }
   };
 

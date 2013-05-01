@@ -260,15 +260,24 @@
             res.send(err, 500);
           } else {
             var token = utils.uid(64);
-            var webSocketUrl = 'ws://' + req.get('host') + '/1/users/' + userId + '/files/' + fileId + '/websocket/' + token
-            
-            var event = new ApiExtensionEvent(req, {
+            var host = req.get('host');
+            var path = '/1/users/' + userId + '/files/' + fileId + '/websocket/' + token;
+            var eventData = {
               sessionId: session._id,
               extensions: api.getExtensions(),
-              fileId: fileId,
-              webSocketUrl: webSocketUrl
-            });
+              fileId: fileId
+            };
+            
+            if (process.env.COOPS_INSECURE_PORT) {
+              eventData.insecureWebSocketUrl = 'ws://' + host + path;
+            }
+
+            if (process.env.COOPS_SECURE_PORT && process.env.COOPS_SECURE_CERT && process.env.COOPS_SECURE_CERT_KEY) {
+              eventData.secureWebSocketUrl = 'wss://' + host + path;
+            }
               
+            var event = new ApiExtensionEvent(req, eventData);
+            
             extensionEventEmitter.emit("fileJoin", event);
             api.sendResponse(res,
               api.createResponseBuilder()

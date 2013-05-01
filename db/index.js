@@ -1,6 +1,7 @@
 (function() {
+
   var mongoose = require('mongoose');
-  mongoose.connect(process.env.MONGO_COOPS_SERVER_URI || process.env.MONGOLAB_URI || process.env.MONGOHQ_URL);
+  mongoose.connect(process.env.COOPS_MONGO_SERVER_URI || process.env.MONGOLAB_URI || process.env.MONGOHQ_URL);
   var db = mongoose.connection;
   db.on('error', console.error.bind(console, 'connection error:'));
   

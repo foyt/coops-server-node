@@ -3,6 +3,9 @@
  */
 var express = require('express');
 var http = require('http');
+var https = require('https');
+var fs = require('fs');
+
 var passport = require('passport');
 var util = require('util');
 var utils = require('./utils');
@@ -16,7 +19,25 @@ var websocket = require('./websocket.js');
  * Express setup
  */
 var app = express();
-var server = http.createServer(app);
+var unsecureServer = null;
+var secureServer = null;
+
+if (process.env.COOPS_UNSECURE_PORT) {
+  unsecureServer = http.createServer(app);
+  unsecureServer.listen(process.env.COOPS_UNSECURE_PORT);
+  console.log("Listening unsecure port " + process.env.COOPS_UNSECURE_PORT);
+} 
+
+if (process.env.COOPS_SECURE_PORT && process.env.COOPS_SECURE_CERT && process.env.COOPS_SECURE_CERT_KEY) {
+  var certificate = { 
+    key: fs.readFileSync(process.env.COOPS_SECURE_CERT_KEY).toString(), 
+    cert: fs.readFileSync(process.env.COOPS_SECURE_CERT).toString() 
+  };
+
+  secureServer = https.createServer(certificate, app);
+  secureServer.listen(process.env.COOPS_SECURE_PORT);
+  console.log("Listening secure port " + process.env.COOPS_SECURE_PORT);
+}
 
 app.set('views', __dirname + '/views')
 app.set('view engine', 'jade');
@@ -30,7 +51,7 @@ app.use(app.router);
 app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
 app.use(roles.can);
 
-websocket.initialize(server);
+websocket.initialize(unsecureServer, secureServer);
 
 /**
  * Lists all users. 
@@ -91,5 +112,3 @@ app.get('/setup/add-client', [ passport.authenticate('admin', { session: false }
 app.get('/setup/edit-client', [ passport.authenticate('admin', { session: false }) ], views.setupEditClient); 
 app.post('/setup/add-client', [ passport.authenticate('admin', { session: false }) ], views.setupCreateClient); 
 app.post('/setup/edit-client', [ passport.authenticate('admin', { session: false }) ], views.setupModifyClient); 
-
-server.listen(process.env.PORT_COOPS_SERVER || process.env.PORT ||8080);
