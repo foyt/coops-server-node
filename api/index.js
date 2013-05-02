@@ -261,6 +261,11 @@
           } else {
             var token = utils.uid(64);
             var host = req.get('host');
+            var hostPortIndex = host.indexOf(':');
+            if (hostPortIndex != -1) {
+              host = host.substring(0, hostPortIndex);
+            }
+            
             var path = '/1/users/' + userId + '/files/' + fileId + '/websocket/' + token;
             var eventData = {
               sessionId: session._id,
@@ -269,11 +274,13 @@
             };
             
             if (process.env.COOPS_UNSECURE_WEBSOCKET == "true") {
-              eventData.unsecureWebSocketUrl = 'ws://' + host + path;
+              var unsecurePort = process.env.COOPS_UNSECURE_WEBSOCKET_PORT || process.env.COOPS_UNSECURE_PORT;
+              eventData.unsecureWebSocketUrl = 'ws://' + host + ':' + unsecurePort + path;
             }
 
             if (process.env.COOPS_SECURE_WEBSOCKET == "true") {
-              eventData.secureWebSocketUrl = 'wss://' + host + path;
+              var securePort = process.env.COOPS_SECURE_WEBSOCKET_PORT || process.env.COOPS_SECURE_PORT;
+              eventData.secureWebSocketUrl = 'wss://' + host + ':' + securePort + path;
             }
               
             var event = new ApiExtensionEvent(req, eventData);

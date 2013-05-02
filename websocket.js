@@ -7,8 +7,33 @@
   var events = require('events');
   var db = require('./db');
   
-  var connectedClients = new Array();
+  var connectedClients = new Object();
   
+  function getConnectedClients(fileId) {
+    return connectedClients[fileId];
+  }
+  
+  function removeConnectedClient(client) {
+    var clients = connectedClients[client.getFileId()];
+
+    for (var i = clients.length - 1; i >= 0; i--) {
+      if (clients[i] === client) {
+        clients.splice(i, 1);
+        break;
+      }
+    }
+    
+    client.deinitialize(); 
+  }
+   
+  function addConnectedClient(client) {
+    var clients = connectedClients[client.getFileId()];
+    if (clients == null) {
+      connectedClients[client.getFileId()] = clients = new Array();
+    }
+    clients.push(client);
+  }
+    
   var Client = function (clientId, fileId, webSocket) {
     events.EventEmitter.call(this);
 
@@ -24,10 +49,11 @@
     this.on("receivePatch", function (event) {
       _this._onReceivePatch(event);
     });
-    
+    /**
     this.on("receiveSelection", function (event) {
       _this._onReceiveSelection(event);
     });
+    **/
   };
   
   Client.super_ = events.EventEmitter;
@@ -46,11 +72,13 @@
         return this._webSocket;
       }
     },
+    getFileId: {
+      value: function () {
+        return this._fileId;
+      }
+    },
     sendRevision: {
       value: function(fileRevision) {
-  	    
-  	    console.log("Sending revision");
-  	    
         this._webSocket.send(JSON.stringify({
           type: 'patch',
           patch: fileRevision.patch,
@@ -59,6 +87,7 @@
         }));
       }
     },
+    /**
     sendSelectionChange: {
       value: function(data) {
         this._webSocket.send(JSON.stringify({
@@ -69,7 +98,7 @@
         }));
       }
     },
-
+    **/
     _applyPatch: {
       value: function(patch, text) {
         var patchApplied = true;
@@ -94,14 +123,16 @@
     
     _sendRevisionToOthers: {
       value: function (fileRevision) {
-        for (var i = connectedClients.length - 1; i >= 0; i--) {
-          if (connectedClients[i] !== this) {
-            connectedClients[i].sendRevision(fileRevision);
+        var clients = getConnectedClients(fileRevision.fileId);
+      
+        for (var i = clients.length - 1; i >= 0; i--) {
+          if (clients[i] !== this) {
+            clients[i].sendRevision(fileRevision);
           }
         }
       }
     },
-    
+    /**
     _sendSelectionToOthers: {
       value: function (data) {
         for (var i = connectedClients.length - 1; i >= 0; i--) {
@@ -112,14 +143,11 @@
         
       }
     },
-    
+    **/
     _onWebSocketMessage: {
       value: function(data, flags) {
         // flags.binary will be set if a binary data is received
         // flags.masked will be set if the data was masked
-        
-        console.log("Received websocket message");
-        
         var json = JSON.parse(data);
         
         switch (json.type) {
@@ -129,20 +157,19 @@
               revisionNumber: json.revisionNumber
             });
           break;
+          /**
           case 'selection':
             this.emit("receiveSelection", {
               selections: json.selections,
               revisionNumber: json.revisionNumber
             });
           break;
+          **/
         }
       }
     },
     _acceptPatch: {
       value: function(revisionNumber) {
-
-  	    console.log("Accepting patch");
-
         this._webSocket.send(JSON.stringify({
           type: 'patchAccepted',
           revisionNumber: revisionNumber
@@ -151,9 +178,6 @@
     },
     _rejectPatch: {
       value: function(revisionNumber, reason) {
-  	    
-  	    console.log("Rejecting patch");
-  	    
         this._webSocket.send(JSON.stringify({
           type: 'patchRejected',
           revisionNumber: revisionNumber,
@@ -219,9 +243,6 @@
       value: function (event) {
   	    var patch = event.patch;
   	    var patchRevision = event.revisionNumber;
-  	    
-  	    console.log("Patch received");
-  	    
   	    var _this = this;
   	    db.model.File.findOne({ '_id': this._fileId }, function (err, file) {
   	      if (err) {
@@ -237,7 +258,7 @@
   	      }
   	    });
   	  }
-    },
+    }/**,
     
     _onReceiveSelection: {
       value: function (event) {
@@ -251,6 +272,7 @@
         });  
       }
     }
+    **/
   });
 
   var clientIdCounter = new Date().getTime();
@@ -265,19 +287,12 @@
   
     var client = new Client(clientId, fileId, webSocket);
     webSocket.on('close', function() {
-      for (var i = connectedClients.length - 1; i >= 0; i--) {
-        if (connectedClients[i] === client) {
-          connectedClients.splice(i, 1);
-          break;
-        } 
-      }
-
-      client.deinitialize();
+      removeConnectedClient(client);
     });
     
-    connectedClients.push(client);
+    addConnectedClient(client);
     
-    console.log("Client connected. Client count " + connectedClients.length);
+    console.log("Client connected. Client count " + getConnectedClients(fileId).length);
     console.log("  fileId:" + fileId); 
     console.log("  userId:" + userId); 
     console.log("  clientId:" + clientId);
