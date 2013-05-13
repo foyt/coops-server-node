@@ -7,7 +7,7 @@
     "url": "git://github.com/foyt/coops-server-node.git"
   },
   "engines": {
-    "node": ">0.4.0"
+    "node": ">0.10.0"
   },
   "dependencies": {
     "express": "3.x",
@@ -20,9 +20,10 @@
     "oauth2orize": "0.x.x",
     "jade": "*",
     "underscore": "*",
-    "ws": "*",
+    "ws": "0.4.25",
     "googlediff": "0.1.0",
-    "crc": "0.2.0"
+    "crc": "0.2.0",
+    "async": "0.2.8"
   },
   "subdomain": "coops-server-node",
   "scripts": {

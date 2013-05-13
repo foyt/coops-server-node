@@ -1,4 +1,5 @@
 (function() {
+  var async = require('async');
   var db = require("../db");
   var utils = require("../utils");
   var _ = require('underscore');
@@ -357,6 +358,143 @@
     var fileId = req.params.fileid;
 
     res.send("Patch doc: " + userId + "," + fileId);
+  };
+  
+  module.exports.getFileUsers = function(req, res) {
+    var fileId = req.params.fileid;
+    
+    db.model.FileUser.find({ fileId: fileId }, function (err, fileUsers) {
+      if (err) {
+        res.send(err, 500);
+      } else {
+        var data = new Array();
+        fileUsers.forEach(function (fileUser) {
+          data.push({
+            userId: fileUser.userId,
+            role: fileUser.role
+          });
+        });
+      
+        api.sendResponse(res,
+          api.createResponseBuilder()
+            .setStatus(api.STATUS_OK)
+            .setResponse(data)
+            .build()
+        ); 
+      }
+    });
+  };
+  
+  module.exports.updateFileUsers = function(req, res) {
+    var fileId = req.params.fileid;
+    var roles = ['OWNER', 'WRITER', 'READER'];
+    
+    var fileUsers = req.body;
+    if (Array.isArray(fileUsers)) {
+      var changes = new Object();
+    
+      for (var i = 0, l = fileUsers.length; i < l; i++) {
+        var fileUser = fileUsers[i];
+        if ((fileUser.role == undefined) || (fileUser.userId == undefined)) {
+          res.send("Invalid request", 500);
+          return;
+        }
+        
+        if (roles.indexOf(fileUser.role) == -1) {
+          res.send("Invalid role specified", 500);
+          return;
+        }
+        
+        if (changes[fileUser.userId]) {
+          res.send("Two roles specified for user", 500);
+          return;
+        }
+        
+        changes[fileUser.userId] = fileUser.role;
+      }
+      
+      var userIds = _.keys(changes);
+      
+      db.model.FileUser.find({ 'userId': { $in: userIds }, 'fileId': fileId }, function (err, fileUsers) {
+        if (err) {
+          res.send("Could not find existing users", 500);  
+        } else {
+      		var current = _.object(_.pluck(fileUsers, 'userId'), _.pluck(fileUsers, 'role'));
+      		var newFileUsers = new Array();
+      		var deletedFileUsers = new Array();
+      		var updatedFileUsers = new Array();
+
+          for (var i = 0, l = userIds.length; i < l; i++) {
+            var userId = userIds[i];
+            if (!current[userId]) {
+              // New file user
+              if (changes[userId] != 'OWNER') {
+                var fileUser = new db.model.FileUser();
+                fileUser.userId = userId;
+                fileUser.fileId = fileId;
+                fileUser.role = changes[userId];
+                newFileUsers.push(fileUser);
+              } else {
+                res.send("Cannot add new owner", 403);
+                return;
+              }
+            } else if (current[userId] != changes[userId]) {
+              // Changed file user
+             	if (!changes[userId]) {
+             	  if (current[userId] != 'OWNER') {
+                  // File user removed
+             	    deletedFileUsers.push(current[userId]);
+                } else {
+                  res.send("Cannot remove file owner", 403);
+                  return;
+                }
+             	} else {
+             	  if (current[userId] != 'OWNER') {
+                  // File user role changed
+                  var fileUser = current[userId];
+             	    fileUser.role = changes[userId];
+             	    updatedFileUsers.push(fileUser);
+             	  } else {
+             	    res.send("Cannot change file owner role", 403);
+                  return;
+             	  }
+             	}
+            }
+          }
+	 	
+      		// New and updated can be done in one save batch
+      		var saves = new Array();
+      		newFileUsers.concat(updatedFileUsers).forEach(function (fileUser) {
+      		  saves.push(function (callback) {
+      		    fileUser.save(callback);
+      		  });
+      		});
+      		
+      		async.parallel(saves, function (err, results) {
+      		  if (err) {
+              res.send("Could not persist some of the role changes", 500);
+      		  } else {
+      		    var deletes = new Array();
+      		    deletedFileUsers.forEach(function (fileUser) {
+      		      deletes.push(function (callback) {
+      		        fileUser.remove(callback);
+      		      });
+      		    });
+      		    
+        		async.parallel(deletes, function (err, results) {
+        		  if (err) {
+                res.send("Could not persist some of the role changes", 500);
+      		    } else {
+      		      res.send("{}", 200);
+      		    }
+        		});
+      		  }
+      		});
+        }
+      });
+    } else {
+      res.send("Invalid request", 500);
+    }
   };
   
 }).call(this);

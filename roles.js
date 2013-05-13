@@ -7,9 +7,8 @@
       res.send("Unauthorized", 401);
     } else {
       if (req.user._id != req.params.userid) {
-        res.send("Forbidden", 403);
+        res.send("User does not match logged user", 403);
       } else {
-  
         var fileId = req.params.fileid;
         
         db.model.FileUser.findOne({fileId: fileId, userId: req.user._id}, function (err, fileUser) {
@@ -19,10 +18,10 @@
           }
           
           if (!fileUser) {
-            res.send("Forbidden", 403);
+            res.send("User has no role in file", 403);
           } else {
             if (roles.indexOf(fileUser.role) == -1) {
-              res.send("Forbidden", 403);    
+              res.send("User lacks required role", 403);    
             } else {
               next();
             }
@@ -87,6 +86,14 @@
         case 'get-file':
           // User may view file if role of the user in file is either OWNER, WRITER or READER
           checkFileRole(req, res, ['OWNER', 'WRITER', 'READER'], next);   
+        break;
+        case 'get-file-users':
+          // User may list file users if role of the user in file is either OWNER, WRITER or READER
+          checkFileRole(req, res, ['OWNER', 'WRITER', 'READER'], next);   
+        break;
+        case 'update-file-users':
+          // User may list file users if role of the user in file is either OWNER, WRITER or READER
+          checkFileRole(req, res, ['OWNER', 'WRITER'], next);   
         break;
         case 'save-file':
           // User may save a file if role of the user in file is either OWNER or WRITER

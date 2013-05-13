@@ -103,6 +103,16 @@ app.patch('/1/users/:userid/files/:fileid', [ passport.authenticate('bearer', { 
 
 /* <-- CoOPS */
 
+/**
+ * Returns file users
+ */
+app.get('/1/users/:userid/files/:fileid/users', [ passport.authenticate('bearer', { session: false }), roles.can('get-file-users') ], api.getFileUsers);      
+
+/**
+ * Saves file users
+**/
+app.post('/1/users/:userid/files/:fileid/users', [ passport.authenticate('bearer', { session: false }), roles.can('update-file-users') ], api.updateFileUsers);      
+
 app.get('/', views.index);
 
 // Configuration views
