@@ -262,7 +262,7 @@
             res.send(err, 500);
           } else {
             var token = utils.uid(64);
-            var clientId = (clientIdCounter++);
+            var clientId = clientIdCounter++;
             
             var host = req.get('host');
             var hostPortIndex = host.indexOf(':');
@@ -282,7 +282,7 @@
                   sessionId: session._id,
                   extensions: api.getExtensions(),
                   fileId: fileId,
-                  clientId: clientId
+                  clientId: webSocketToken.clientId
                 };
                 
                 if (process.env.COOPS_UNSECURE_WEBSOCKET == "true") {

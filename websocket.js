@@ -134,14 +134,7 @@
         }
       }
     },
-    _acceptPatch: {
-      value: function(revisionNumber) {
-        this._webSocket.send(JSON.stringify({
-          type: 'patchAccepted',
-          revisionNumber: revisionNumber
-        }));
-      }
-    },
+
     _rejectPatch: {
       value: function(revisionNumber, reason) {
         this._webSocket.send(JSON.stringify({
@@ -197,7 +190,6 @@
                       _this._rejectPatch(patchRevision, "Failed to persist content: " + err);
                     });
                   } else {
-                    _this._acceptPatch(fileRevision.revisionNumber);
                     _this._sendRevisionToClients(fileRevision);
                   }
                 });
