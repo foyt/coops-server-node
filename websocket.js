@@ -49,11 +49,6 @@
     this.on("receivePatch", function (event) {
       _this._onReceivePatch(event);
     });
-    /**
-    this.on("receiveSelection", function (event) {
-      _this._onReceiveSelection(event);
-    });
-    **/
   };
   
   Client.super_ = events.EventEmitter;
@@ -78,27 +73,17 @@
       }
     },
     sendRevision: {
-      value: function(fileRevision) {
+      value: function(clientId, fileRevision) {
         this._webSocket.send(JSON.stringify({
           type: 'patch',
+          userId: fileRevision.userId,
+          clientId: clientId,
           patch: fileRevision.patch,
           revisionNumber: fileRevision.revisionNumber,
           checksum: fileRevision.checksum
         }));
       }
     },
-    /**
-    sendSelectionChange: {
-      value: function(data) {
-        this._webSocket.send(JSON.stringify({
-          type: 'selection',
-          clientId: data.clientId,
-          selections: data.selections,
-          revisionNumber: data.revisionNumber
-        }));
-      }
-    },
-    **/
     _applyPatch: {
       value: function(patch, text) {
         var patchApplied = true;
@@ -121,50 +106,31 @@
       }
     },
     
-    _sendRevisionToOthers: {
+    _sendRevisionToClients: {
       value: function (fileRevision) {
         var clients = getConnectedClients(fileRevision.fileId);
       
         for (var i = clients.length - 1; i >= 0; i--) {
-          if (clients[i] !== this) {
-            clients[i].sendRevision(fileRevision);
-          }
+          clients[i].sendRevision(this._clientId, fileRevision);
         }
       }
     },
-    /**
-    _sendSelectionToOthers: {
-      value: function (data) {
-        for (var i = connectedClients.length - 1; i >= 0; i--) {
-          if (connectedClients[i] !== this) {
-            connectedClients[i].sendSelectionChange(data);
-          }
-        }
-        
-      }
-    },
-    **/
+    
     _onWebSocketMessage: {
       value: function(data, flags) {
         // flags.binary will be set if a binary data is received
         // flags.masked will be set if the data was masked
         var json = JSON.parse(data);
+        var userId = this._userId;
         
         switch (json.type) {
           case 'patch':
             this.emit("receivePatch", {
               patch: json.patch,
-              revisionNumber: json.revisionNumber
+              revisionNumber: json.revisionNumber,
+              userId: userId
             });
           break;
-          /**
-          case 'selection':
-            this.emit("receiveSelection", {
-              selections: json.selections,
-              revisionNumber: json.revisionNumber
-            });
-          break;
-          **/
         }
       }
     },
@@ -187,9 +153,15 @@
     },
     
     _createRevision: {
-      value: function (file, revisionNumber, patch, checksum, callback) {
+      value: function (file, userId, revisionNumber, patch, checksum, callback) {
         // New revision
-        new db.model.FileRevision({ fileId: file._id, revisionNumber: revisionNumber, patch: patch, checksum: checksum }).save(function (err, fileRevision) {
+        new db.model.FileRevision({ 
+          fileId: file._id, 
+          userId: userId,
+          revisionNumber: revisionNumber, 
+          patch: patch, 
+          checksum: checksum 
+        }).save(function (err, fileRevision) {
           if (err) {
             callback(err, null);
           } else {
@@ -204,7 +176,7 @@
     },
     
     _patchFile: {
-      value: function (file, patchRevision, patch) {
+      value: function (file, userId, patchRevision, patch) {
         var _this = this;
         
         db.model.FileContent.findOne({ 'fileId': file._id}, function (err, fileContent) {
@@ -212,7 +184,7 @@
           if (patchResult.applied) {
             var checksum = crc.crc32(patchResult.patchedText);
             // Patch applied succesfully
-            _this._createRevision(file, patchRevision + 1, patch, checksum, function (err, fileRevision) {
+            _this._createRevision(file, userId, patchRevision + 1, patch, checksum, function (err, fileRevision) {
               if (err) {
                 fileRevision.remove(function () {
                   _this._rejectPatch(patchRevision, "Failed to create revision: " + err);
@@ -226,7 +198,7 @@
                     });
                   } else {
                     _this._acceptPatch(fileRevision.revisionNumber);
-                    _this._sendRevisionToOthers(fileRevision);
+                    _this._sendRevisionToClients(fileRevision);
                   }
                 });
               }
@@ -243,6 +215,7 @@
       value: function (event) {
   	    var patch = event.patch;
   	    var patchRevision = event.revisionNumber;
+  	    var userId = event.userId;
   	    var _this = this;
   	    db.model.File.findOne({ '_id': this._fileId }, function (err, file) {
   	      if (err) {
@@ -250,7 +223,7 @@
   	      } else {
   	        if (file.revisionNumber == patchRevision) {
   	          // Patch is to this revision so we can accept it
-  	          _this._patchFile(file, patchRevision, patch);          
+  	          _this._patchFile(file, userId, patchRevision, patch);          
   	        } else {
   	          // Patch is not to this revision, so we reject it
   	          _this._rejectPatch(patchRevision, "Out of sync");
@@ -258,24 +231,8 @@
   	      }
   	    });
   	  }
-    }/**,
-    
-    _onReceiveSelection: {
-      value: function (event) {
-        var selections = event.selections;
-        var patchRevision = event.revisionNumber;
-        
-        this._sendSelectionToOthers({
-          selections: selections,
-          patchRevision: patchRevision,
-          clientId: this._clientId
-        });  
-      }
     }
-    **/
   });
-
-  var clientIdCounter = new Date().getTime();
   
   function onWebSocketServerConnection(webSocket) {
     var url = webSocket.upgradeReq.url;
@@ -283,19 +240,33 @@
     var userId = slices[3];
     var fileId = slices[5];
     var token = slices[7];
-    var clientId = (clientIdCounter++);
   
-    var client = new Client(clientId, fileId, webSocket);
-    webSocket.on('close', function() {
-      removeConnectedClient(client);
+    db.model.WebSocketToken.findOne({ 'token': token }, function (err1, webSocketToken) {
+      if (err1) {
+        webSocket.close(1011, err1);
+      } else if (webSocketToken) {
+        var clientId = webSocketToken.clientId;
+        webSocketToken.remove(function (err2) {
+          if (err2) {
+            webSocket.close(1011, err2);
+          } else {
+            var client = new Client(clientId, fileId, webSocket);
+            webSocket.on('close', function() {
+              removeConnectedClient(client);
+            });
+            
+            addConnectedClient(client);
+            
+            console.log("Client connected. Client count " + getConnectedClients(fileId).length);
+            console.log("  fileId:" + fileId); 
+            console.log("  userId:" + userId); 
+            console.log("  clientId:" + clientId);            
+          }
+        });
+      } else {
+        webSocket.close(1000, "Permission Denied");
+      }
     });
-    
-    addConnectedClient(client);
-    
-    console.log("Client connected. Client count " + getConnectedClients(fileId).length);
-    console.log("  fileId:" + fileId); 
-    console.log("  userId:" + userId); 
-    console.log("  clientId:" + clientId);
   };
    
   module.exports = {

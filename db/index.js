@@ -5,7 +5,7 @@
   var db = mongoose.connection;
   db.on('error', console.error.bind(console, 'connection error:'));
   
-  /* AccessToken */
+  /* AccessTokenSchema */
   
   var AccessTokenSchema = mongoose.Schema({
     token: String,
@@ -15,7 +15,7 @@
     clientId: mongoose.Schema.Types.ObjectId
   });
   
-  /* Client */
+  /* ClientSchema */
 
   var ClientSchema = mongoose.Schema({
     name: String,
@@ -23,7 +23,7 @@
     clientSecret: String
   });
   
-  /* User */
+  /* UserSchema */
   
   var UserSchema = mongoose.Schema({
     name: String
@@ -54,17 +54,25 @@
   
   var FileRevisionSchema = mongoose.Schema({
     fileId: mongoose.Schema.Types.ObjectId,
+    userId: mongoose.Schema.Types.ObjectId,
     revisionNumber: Number,
     patch: String,
     checksum: Number
   });
   
-  /* Session */
+  /* SessionSchema */
   
   var SessionSchema = mongoose.Schema({
     fileId: mongoose.Schema.Types.ObjectId,
     userId: mongoose.Schema.Types.ObjectId,
     algorithm: String
+  });
+  
+  /* WebSocketTokenSchema */
+  
+  var WebSocketTokenSchema = mongoose.Schema({
+    token: String,
+    clientId: String
   });
   
   module.exports = {
@@ -76,7 +84,8 @@
       FileContent: mongoose.model('FileContent', FileContentSchema),
       FileRevision: mongoose.model('FileRevision', FileRevisionSchema),
       FileUser: mongoose.model('FileUser', FileUserSchema),
-      Session: mongoose.model('Session', SessionSchema)
+      Session: mongoose.model('Session', SessionSchema),
+      WebSocketToken: mongoose.model('WebSocketToken', WebSocketTokenSchema)
     }
   };
   
