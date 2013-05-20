@@ -8,7 +8,6 @@ var fs = require('fs');
 
 var passport = require('passport');
 var util = require('util');
-var utils = require('./utils');
 var views = require("./views");
 var api = require("./api");
 var roles = require('./roles.js');

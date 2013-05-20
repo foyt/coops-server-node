@@ -1,48 +1,15 @@
 (function() {
   var async = require('async');
   var db = require("../db");
-  var utils = require("../utils");
+  var crypto = require('crypto');
   var _ = require('underscore');
   
-  var events = require('events');
-  var api = require('./api.js')
-    .setProtocolVersion("1.0.0draft1")
-    .setAlgorithms("dmp")
-    .setExtensions([
-      'websockets',
-      'x-http-method-override'
-    ]).build();
+  var VERSION = '1.0.0draft1';
+  var ALGORITHMS = ['dmp'];
+  var EXTENSIONS = ['websockets', 'x-http-method-override'];
   
-  var extensionEventEmitter = new events.EventEmitter();
   var clientIdCounter = new Date().getTime();
     
-  function ApiExtensionEvent(request, data) {
-    this._request = request;
-    this._data = data||{};
-  };
-  
-  ApiExtensionEvent.prototype = Object.create(null, {
-    constructor: {
-      value: ApiExtensionEvent,
-      enumerable: false
-    },
-    getRequest: {
-      value: function () {
-        return this._request;
-      }
-    },
-    setProperty: {
-      value: function (name, value) {
-        this._data[name] = value;
-      } 
-    },
-    getData: {
-      value: function () {
-        return this._data;
-      }
-    }
-  });
-  
   // Exports
   
   module.exports.createUser = function (req, res) {
@@ -57,14 +24,14 @@
       } else {
         var expireTime = 1000 * 60 * 60 * 24;
         var accessToken = new db.model.AccessToken();
-        accessToken.token = utils.uid(256);
-        accessToken.refreshToken = utils.uid(256);
+        accessToken.token = crypto.randomBytes(64).toString('hex');
+        accessToken.refreshToken = crypto.randomBytes(64).toString('hex');
         accessToken.userId = newUser._id;
         accessToken.clientId = client._id;
         accessToken.expires = expireTime + new Date().getTime();
         
         accessToken.save(function (err, newAccessToken) {
-          var event = new ApiExtensionEvent(req, {
+          var response = {
             "user_id": newAccessToken.userId,
             "access_token": {
               "access_token": newAccessToken.token,
@@ -72,16 +39,10 @@
               "expires_in":  newAccessToken.expires - new Date().getTime(),
               "refresh_token": newAccessToken.refreshToken
             } 
-          });
-                
-          extensionEventEmitter.emit("createUser", event);
-          
-          api.sendResponse(res,
-            api.createResponseBuilder()
-              .setStatus(api.STATUS_OK)
-              .setResponse(event.getData())
-              .build()
-          );
+          };
+
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.send(JSON.stringify(response));
         });
       }
     });   
@@ -92,17 +53,12 @@
       if (err) {
         res.send(err, 500);
       } else {
-        var event = new ApiExtensionEvent(req, {
+        var response = {
           userIds: _.pluck(users, "_id")
-        });
-        
-        extensionEventEmitter.emit("listUsers", event);
-        api.sendResponse(res,
-          api.createResponseBuilder()
-            .setStatus(api.STATUS_OK)
-            .setResponse(event.getData())
-            .build()
-        );
+        };
+
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.send(JSON.stringify(response));
       }
     });
   };
@@ -114,18 +70,13 @@
       if (err) {
         res.send(err, 500);
       } else {
-        var event = new ApiExtensionEvent(req, {
+        var response = {
           userId: user._id,
           name: user.name
-        });
-              
-        extensionEventEmitter.emit("getUser", event);
-        api.sendResponse(res,
-          api.createResponseBuilder()
-            .setStatus(api.STATUS_OK)
-            .setResponse(event.getData())
-            .build()
-        );
+        };
+        
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.send(JSON.stringify(response));
       }
     });
   };
@@ -151,17 +102,12 @@
               if (err) {
                 res.send(err, 500);
               } else {
-                var event = new ApiExtensionEvent(req, {
+                var response = {
                   fileId: file._id
-                });
-                      
-                extensionEventEmitter.emit("createFile", event);
-                api.sendResponse(res,
-                  api.createResponseBuilder()
-                    .setStatus(api.STATUS_OK)
-                    .setResponse(event.getData())
-                    .build()
-                );
+                };
+
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.send(JSON.stringify(response));
               }
             });
           }
@@ -193,17 +139,12 @@
               });
             });
 
-            var event = new ApiExtensionEvent(req, {
+            var response = {
               files: eventFiles
-            });
-
-            extensionEventEmitter.emit("listUserFiles", event);
-            api.sendResponse(res,
-              api.createResponseBuilder()
-                .setStatus(api.STATUS_OK)
-                .setResponse(event.getData())
-                .build()
-            ); 
+            };
+            
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.send(JSON.stringify(response));
           });
         }
       }
@@ -220,39 +161,20 @@
       clientAlgorithms = Array(clientAlgorithms);
     }
     
-    var algorithm = null;
-    var serverAlgorithms = api.getAlgorithms();
     clientAlgorithms.forEach(function (clientAlgorithm) {
-      if (serverAlgorithms.indexOf(clientAlgorithm) > -1) {
+      if (ALGORITHMS.indexOf(clientAlgorithm) > -1) {
         algorithm = clientAlgorithm;
       }
     });
-    
+
     // Version of protocol client is using 
     var protocolVersion = req.query['protocolVersion'];
-    if (api.getProtocolVersion() != protocolVersion) {
-      // TODO: Status code
-    
-      api.sendResponse(res,
-        api.createResponseBuilder()
-          .setStatus(api.STATUS_INTERNAL_SERVER_ERROR)
-          .addMessage("Protocol version mismatch. Client is using " + protocolVersion + " and server " + api.getProtocolVersion())
-          .build()
-      );
+    if (VERSION != protocolVersion) {
+      res.send(501, "Protocol version mismatch. Client is using " + protocolVersion + " and server " + VERSION);
     } else {
       if (algorithm == null) {
-        // TODO: Status code
-        api.sendResponse(res,
-          api.createResponseBuilder()
-            .setStatus(api.STATUS_INTERNAL_SERVER_ERROR)
-            .addMessage("Server and client do not have a commonly supported algorithm. Server supported: " + serverAlgorithms + ", client supported: " + clientAlgorithms)
-            .build()
-        );
+        res.send(501, "Server and client do not have a commonly supported algorithm. Server supported: " + serverAlgorithms + ", client supported: " + clientAlgorithms)
       } else {
-        // TODO: Security
-        // TODO: If user is not logged in: api.STATUS_UNAUTHORIZED
-        // TODO: If user has no permission to file: api.STATUS_FORBIDDEN
-        
         new db.model.Session({
           fileId: fileId,
           userId: userId,
@@ -261,7 +183,7 @@
           if (err) {
             res.send(err, 500);
           } else {
-            var token = utils.uid(64);
+            var token = crypto.randomBytes(64).toString('hex');
             var clientId = clientIdCounter++;
             
             var host = req.get('host');
@@ -278,32 +200,25 @@
                 res.send(err2, 500);
               } else {
                 var path = '/1/users/' + userId + '/files/' + fileId + '/websocket/' + token;
-                var eventData = {
+                var response = {
                   sessionId: session._id,
-                  extensions: api.getExtensions(),
+                  extensions: EXTENSIONS,
                   fileId: fileId,
                   clientId: webSocketToken.clientId
                 };
                 
                 if (process.env.COOPS_UNSECURE_WEBSOCKET == "true") {
                   var unsecurePort = process.env.COOPS_UNSECURE_WEBSOCKET_PORT || process.env.COOPS_UNSECURE_PORT;
-                  eventData.unsecureWebSocketUrl = 'ws://' + host + ':' + unsecurePort + path;
+                  response.unsecureWebSocketUrl = 'ws://' + host + ':' + unsecurePort + path;
                 }
   
                 if (process.env.COOPS_SECURE_WEBSOCKET == "true") {
                   var securePort = process.env.COOPS_SECURE_WEBSOCKET_PORT || process.env.COOPS_SECURE_PORT;
-                  eventData.secureWebSocketUrl = 'wss://' + host + ':' + securePort + path;
+                  response.secureWebSocketUrl = 'wss://' + host + ':' + securePort + path;
                 }
-                  
-                var event = new ApiExtensionEvent(req, eventData);
-                
-                extensionEventEmitter.emit("fileJoin", event);
-                api.sendResponse(res,
-                  api.createResponseBuilder()
-                    .setStatus(api.STATUS_OK)
-                    .setResponse(event.getData())
-                    .build()
-                );
+
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.send(JSON.stringify(response));
               }
             });
           }
@@ -328,21 +243,16 @@
             if (err) {
               res.send(err, 500);
             } else {
-              var event = new ApiExtensionEvent(req, {
+              var response = {
                 fileId: fileId,
                 revisionNumber: file.revisionNumber,
                 name: file.name,
                 content: fileContent.content,
                 contentType: fileContent.contentType
-              });
+              };
 
-              extensionEventEmitter.emit("getFile", event);
-              api.sendResponse(res,
-                api.createResponseBuilder()
-                  .setStatus(api.STATUS_OK)
-                  .setResponse(event.getData())
-                  .build()
-              );    
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.send(JSON.stringify(response));    
             }
           });
         }
@@ -380,20 +290,16 @@
       if (err) {
         res.send(err, 500);
       } else {
-        var data = new Array();
+        var response = new Array();
         fileUsers.forEach(function (fileUser) {
-          data.push({
+          response.push({
             userId: fileUser.userId,
             role: fileUser.role
           });
         });
-      
-        api.sendResponse(res,
-          api.createResponseBuilder()
-            .setStatus(api.STATUS_OK)
-            .setResponse(data)
-            .build()
-        ); 
+        
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.send(JSON.stringify(response));
       }
     });
   };
@@ -498,6 +404,7 @@
         		  if (err) {
                 res.send("Could not persist some of the role changes", 500);
       		    } else {
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
       		      res.send("{}", 200);
       		    }
         		});
