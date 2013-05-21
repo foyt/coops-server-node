@@ -60,14 +60,6 @@
     checksum: Number
   });
   
-  /* SessionSchema */
-  
-  var SessionSchema = mongoose.Schema({
-    fileId: mongoose.Schema.Types.ObjectId,
-    userId: mongoose.Schema.Types.ObjectId,
-    algorithm: String
-  });
-  
   /* WebSocketTokenSchema */
   
   var WebSocketTokenSchema = mongoose.Schema({
@@ -84,7 +76,6 @@
       FileContent: mongoose.model('FileContent', FileContentSchema),
       FileRevision: mongoose.model('FileRevision', FileRevisionSchema),
       FileUser: mongoose.model('FileUser', FileUserSchema),
-      Session: mongoose.model('Session', SessionSchema),
       WebSocketToken: mongoose.model('WebSocketToken', WebSocketTokenSchema)
     }
   };
