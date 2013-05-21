@@ -175,50 +175,54 @@
       if (algorithm == null) {
         res.send(501, "Server and client do not have a commonly supported algorithm. Server supported: " + serverAlgorithms + ", client supported: " + clientAlgorithms)
       } else {
-        new db.model.Session({
-          fileId: fileId,
-          userId: userId,
-          algorithm: algorithm
-        }).save(function (err, session) {
-          if (err) {
-            res.send(err, 500);
+        db.model.File.findOne({ _id: fileId },function (err1, file) {
+          if (err1) {
+            res.send(err1, 500);
           } else {
-            var token = crypto.randomBytes(64).toString('hex');
-            var clientId = clientIdCounter++;
-            
-            var host = req.get('host');
-            var hostPortIndex = host.indexOf(':');
-            if (hostPortIndex != -1) {
-              host = host.substring(0, hostPortIndex);
-            }
-            
-            new db.model.WebSocketToken({
-              token: token,
-              clientId: clientId
-            }).save(function (err2, webSocketToken) {
+            db.model.FileContent.findOne({ fileId: file._id },function (err2, fileContent) {
               if (err2) {
                 res.send(err2, 500);
               } else {
-                var path = '/1/users/' + userId + '/files/' + fileId + '/websocket/' + token;
-                var response = {
-                  sessionId: session._id,
-                  extensions: EXTENSIONS,
-                  fileId: fileId,
-                  clientId: webSocketToken.clientId
-                };
+                var token = crypto.randomBytes(64).toString('hex');
+                var clientId = clientIdCounter++;
                 
-                if (process.env.COOPS_UNSECURE_WEBSOCKET == "true") {
-                  var unsecurePort = process.env.COOPS_UNSECURE_WEBSOCKET_PORT || process.env.COOPS_UNSECURE_PORT;
-                  response.unsecureWebSocketUrl = 'ws://' + host + ':' + unsecurePort + path;
+                var host = req.get('host');
+                var hostPortIndex = host.indexOf(':');
+                if (hostPortIndex != -1) {
+                  host = host.substring(0, hostPortIndex);
                 }
-  
-                if (process.env.COOPS_SECURE_WEBSOCKET == "true") {
-                  var securePort = process.env.COOPS_SECURE_WEBSOCKET_PORT || process.env.COOPS_SECURE_PORT;
-                  response.secureWebSocketUrl = 'wss://' + host + ':' + securePort + path;
-                }
-
-                res.setHeader('Content-Type', 'application/json; charset=utf-8');
-                res.send(JSON.stringify(response));
+                
+                new db.model.WebSocketToken({
+                  token: token,
+                  clientId: clientId
+                }).save(function (err2, webSocketToken) {
+                  if (err2) {
+                    res.send(err2, 500);
+                  } else {
+                    var path = '/1/users/' + userId + '/files/' + fileId + '/websocket/' + token;
+                    var response = {
+                      extensions: EXTENSIONS,
+                      fileId: file._id,
+                      revisionNumber: file.revisionNumber,
+                      content: fileContent.content,
+                      contentType: fileContent.contentType,
+                      clientId: webSocketToken.clientId
+                    };
+                    
+                    if (process.env.COOPS_UNSECURE_WEBSOCKET == "true") {
+                      var unsecurePort = process.env.COOPS_UNSECURE_WEBSOCKET_PORT || process.env.COOPS_UNSECURE_PORT;
+                      response.unsecureWebSocketUrl = 'ws://' + host + ':' + unsecurePort + path;
+                    }
+      
+                    if (process.env.COOPS_SECURE_WEBSOCKET == "true") {
+                      var securePort = process.env.COOPS_SECURE_WEBSOCKET_PORT || process.env.COOPS_SECURE_PORT;
+                      response.secureWebSocketUrl = 'wss://' + host + ':' + securePort + path;
+                    }
+    
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                    res.send(JSON.stringify(response));
+                  }
+                });
               }
             });
           }
