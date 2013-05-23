@@ -81,39 +81,109 @@
     });
   };
   
+  /**
+   * Creates new file.
+   * 
+   * Expects following JSON object in request body:
+   * 
+   * {
+   *   "name": "Name of the file",
+   *   "content": "contents of the file (optional)",
+   *   "contentType": "mime/type;editor=preferredEditor"
+   * }
+   * 
+   * Returns following JSON string:
+   * 
+   * {
+   *   "id": "id of created file",
+   *   "revisionNumber": 0,
+   *   "name": "Name of the file",
+   *   "role": "OWNER",
+   *   "content": "contents of the file or blank if not specified",
+   *   "contentType": "mime/type;editor=preferredEditor"
+   * }
+   */
   module.exports.createUserFile = function(req, res) {
-    var userId = req.params.userid;
-    var name = req.body['name'];
-    var content = '<p>Test</p>';
-    var contentType = 'text/html';
-    // TODO: name => post parameter
-    // TODO: Content
-    // TODO: CotnentType
+    var reqBody = req.body;
+    var valid = true;
+    var message = null;
+    var status = 200;
     
-    new db.model.File({ name: name, revisionNumber: 0 }).save(function (err, file) {
-      if (err) {
-        res.send(err, 500);
-      } else {
-        new db.model.FileContent({ fileId: file._id, content: content, contentType: contentType }).save(function (err, fileContent) {
-          if (err) {
-            res.send(err, 500);
-          } else {
-            new db.model.FileUser({ fileId: file._id, userId: userId, role: 'OWNER' }).save(function (err, fileUser) {
-              if (err) {
-                res.send(err, 500);
-              } else {
-                var response = {
-                  fileId: file._id
-                };
+    if (!reqBody) {
+      valid = false;
+      message = "Invalid request";
+      status = 400;
+    } 
+    
+    if (valid && (reqBody.id !== undefined)) {
+      valid = false;
+      message = "Cannot specify a id when creating a new file";
+      status = 400;
+    }
+    
+    if (valid && (reqBody.revisionNumber !== undefined)) {
+      valid = false;
+      message = "Cannot specify a revisionNumber when creating a new file";
+      status = 400;
+    }
+    
+    if (valid && (reqBody.role !== undefined)) {
+      valid = false;
+      message = "Cannot specify a role when creating a new file";
+      status = 400;
+    }
+    
+    if (valid && (!reqBody.name)) {
+      valid = false;
+      message = "Name is required when creating a new file";
+      status = 400;
+    }
+    
+    if (valid && (!reqBody.contentType)) {
+      valid = false;
+      message = "contentType is required when creating a new file";
+      status = 400;
+    } 
 
-                res.setHeader('Content-Type', 'application/json; charset=utf-8');
-                res.send(JSON.stringify(response));
-              }
-            });
-          }
-        });
-      }
-    });
+    if  (valid) {
+      var userId = req.params.userid;
+      var name = reqBody.name;
+      // If initial content is undefined or null we change it to blank
+      var content = (reqBody.content === undefined)||(reqBody.content === null) ? '' : reqBody.content;
+      var contentType = reqBody.contentType;
+      
+      new db.model.File({ name: name, revisionNumber: 0 }).save(function (err1, file) {
+        if (err1) {
+          res.send(err1, 500);
+        } else {
+          new db.model.FileContent({ fileId: file._id, content: content, contentType: contentType }).save(function (err2, fileContent) {
+            if (err2) {
+              res.send(err2, 500);
+            } else {
+              new db.model.FileUser({ fileId: file._id, userId: userId, role: 'OWNER' }).save(function (err3, fileUser) {
+                if (err3) {
+                  res.send(err3, 500);
+                } else {
+                  var response = {
+                    id: file._id,
+                    revisionNumber: file.revisionNumber,
+                    name: file.name,
+                    role: fileUser.role,
+                    content: fileContent.content,
+                    contentType: fileContent.contentType
+                  };
+  
+                  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                  res.send(JSON.stringify(response));
+                }
+              });
+            }
+          });
+        }
+      });
+    } else {
+      res.send(message, status);
+    }
   };
   
   module.exports.getUserFiles = function(req, res) {
@@ -232,31 +302,37 @@
   };
   
   module.exports.getUserFile = function(req, res) {
-    // TODO: Security
     var userId = req.params.userid;
     var fileId = req.params.fileid;
     // TODO: Better param name?
     var revision = req.query['revision'];
     
     if (revision === undefined) {
-      db.model.File.findOne({ _id: fileId },function (err, file) {
-        if (err) {
-          res.send(err, 500);
+      db.model.File.findOne({ _id: fileId },function (err1, file) {
+        if (err1) {
+          res.send(err1, 500);
         } else {
-          db.model.FileContent.findOne({ fileId: fileId },function (err, fileContent) {
-            if (err) {
-              res.send(err, 500);
+          db.model.FileContent.findOne({ fileId: fileId },function (err2, fileContent) {
+            if (err2) {
+              res.send(err2, 500);
             } else {
-              var response = {
-                fileId: fileId,
-                revisionNumber: file.revisionNumber,
-                name: file.name,
-                content: fileContent.content,
-                contentType: fileContent.contentType
-              };
-
-              res.setHeader('Content-Type', 'application/json; charset=utf-8');
-              res.send(JSON.stringify(response));    
+              db.model.FileUser.findOne({ fileId: fileId, userId: userId }, function (err3, fileUser) {
+                if (err3) {
+                  res.send(err3, 500);
+                } else {
+                  var response = {
+                    id: fileId,
+                    revisionNumber: file.revisionNumber,
+                    name: file.name,
+                    role: fileUser.role,
+                    content: fileContent.content,
+                    contentType: fileContent.contentType
+                  };
+                  
+                  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                  res.send(JSON.stringify(response)); 
+                }
+              });
             }
           });
         }
