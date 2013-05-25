@@ -4,7 +4,7 @@
   var crypto = require('crypto');
   var _ = require('underscore');
   
-  var VERSION = '1.0.0draft1';
+  var VERSION = '1.0.0draft2';
   var ALGORITHMS = ['dmp'];
   var EXTENSIONS = ['websockets', 'x-http-method-override'];
   
