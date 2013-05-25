@@ -19,10 +19,14 @@ passport.use(new BearerStrategy(function(accessToken, done) {
     token : accessToken
   }, function(err, token) {
     if (err) {
-      return done(err);
+      return done(err, false);
     }
 
     if (!token) {
+      return done(null, false);
+    }
+    
+    if (token.expires < new Date().getTime()) {
       return done(null, false);
     }
 
@@ -37,8 +41,6 @@ passport.use(new BearerStrategy(function(accessToken, done) {
         return done(null, false);
       }
 
-      // to keep this example simple, restricted scopes are not implemented,
-      // and this is just for illustrative purposes
       var info = {
         scope : '*'
       };
