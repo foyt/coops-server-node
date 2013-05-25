@@ -10,6 +10,7 @@ var passport = require('passport');
 var util = require('util');
 var views = require("./views");
 var api = require("./api");
+var oauth = require("./oauth");
 var roles = require('./roles.js');
 var auth = require('./auth');
 var websocket = require('./websocket.js');
@@ -113,6 +114,12 @@ app.get('/1/users/:userid/files/:fileid/users', [ passport.authenticate('bearer'
 app.post('/1/users/:userid/files/:fileid/users', [ passport.authenticate('bearer', { session: false }), roles.can('update-file-users') ], api.updateFileUsers);      
 
 app.get('/', views.index);
+
+/**
+ * OAuth
+ **/
+
+app.post('/oauth2/token', [passport.authenticate(['basic', 'oauth2-client-password'], { session: false })], oauth.token);
 
 // Configuration views
 
