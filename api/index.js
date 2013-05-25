@@ -1,8 +1,13 @@
 (function() {
+  
+  // Imports
+  
   var async = require('async');
   var db = require("../db");
   var crypto = require('crypto');
   var _ = require('underscore');
+  
+  // Settings
   
   var VERSION = '1.0.0draft2';
   var ALGORITHMS = ['dmp'];
@@ -186,6 +191,21 @@
     }
   };
   
+  /**
+   * Lists user files. 
+   * 
+   * Returns array of user files:
+   * 
+   *  [
+   *    {
+   *     "id": Id of the file,
+   *     "name": "Name of the file",
+   *     "revisionNumber": Current file revision number,
+   *     "role": "User's role in file" one of OWNER,WRITER or READER
+   *    }, 
+   *    ...
+   *  ]
+   */
   module.exports.getUserFiles = function(req, res) {
     var userId = req.params.userid;
     db.model.FileUser.find({ userId: userId }, 
@@ -198,10 +218,11 @@
             roles[fileUser.fileId] = fileUser.role;
           });
 
+          var response = new Array();
+
           db.model.File.find({ '_id': { $in: _.pluck(fileUsers, "fileId") } }, function (err, files) {
-            var eventFiles = new Array();
             files.forEach(function (file) {
-              eventFiles.push({
+              response.push({
                 id: file._id,
                 name: file.name,
                 revisionNumber: file.revisionNumber,
@@ -209,10 +230,6 @@
               });
             });
 
-            var response = {
-              files: eventFiles
-            };
-            
             res.setHeader('Content-Type', 'application/json; charset=utf-8');
             res.send(JSON.stringify(response));
           });
@@ -221,6 +238,34 @@
     );
   };
   
+  /**
+   * Joins collaboration session
+   * 
+   * Expects following query parametrs:
+   * 
+   *   algorithm=Used difference algorithm
+   *   protocolVersion=Used protocol version
+   *   
+   * 
+   * {
+   *   "name": "Name of the file",
+   *   "content": "contents of the file (optional)",
+   *   "contentType": "mime/type;editor=preferredEditor"
+   * }
+   * 
+   * Returns following JSON string:
+   * 
+   * {
+   *   "extensions": ["array", "of", "supported", "extensions"],
+   *   "fileId": "Id of the file",
+   *   "revisionNumber": Current revision number of the file,
+   *   "content": "contents of the file or blank if not specified",
+   *   "contentType": "mime/type;editor=preferredEditor",
+   *   "clientId": "Unique id of WebSocket client",
+   *   "unsecureWebSocketUrl": "Address for joining WebSocket session (unsecure)",
+   *   "secureWebSocketUrl": "Address for joining WebSocket session (secure)"
+   * }
+   */
   module.exports.joinUserFile = function(req, res) {
     var userId = req.params.userid;
     var fileId = req.params.fileid;
@@ -300,12 +345,30 @@
       }
     }
   };
-  
+
+  /**
+   * Returns user file
+   * 
+   * Following query parameters are supported:
+   * 
+   *   revisionNumber=Return specific revision instead of current revision
+   * 
+   * Returns following JSON string:
+   * 
+   * {
+   *   "id": "Id of the file",
+   *   "name": "Name of the file",
+   *   "revisionNumber": Revision number of returned file,
+   *   "content": "contents of the file or blank if not specified",
+   *   "contentType": "mime/type;editor=preferredEditor",
+   *   "role": "User's role in file" one of OWNER,WRITER or READER
+   * }
+   */
   module.exports.getUserFile = function(req, res) {
     var userId = req.params.userid;
     var fileId = req.params.fileid;
     // TODO: Better param name?
-    var revision = req.query['revision'];
+    var revision = req.query['revisionNumber'];
     
     if (revision === undefined) {
       db.model.File.findOne({ _id: fileId },function (err1, file) {
@@ -496,5 +559,45 @@
       res.send("Invalid request", 500);
     }
   };
+
+  /**
+   * Returns file revisions
+   * 
+   * Returns array of file revisions:
+   * 
+   *  [
+   *    {
+   *      "revisionNumber": Number of revision,
+   *      "userId": "Id of user that made the change",
+   *      "checksum": "Checksum of the revision"
+   *    }, 
+   *    ...
+   *  ]
+   */
+  module.exports.getFileRevisions = function(req, res) {
+    var fileId = req.params.fileid;
+
+    db.model.FileRevision.find({
+      fileId: fileId
+    }, function (err, fileRevisions) {
+      if (err) {
+        res.send("Could not list file revisions", 500);  
+      } else {
+        var response = new Array();
+        
+        fileRevisions.forEach(function (fileRevision) {
+          response.push({
+            revisionNumber: fileRevision.revisionNumber,
+            userId: fileRevision.userId,
+            checksum: fileRevision.checksum,
+            created: fileRevision.created
+          });
+        });
+        
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.send(JSON.stringify(response));
+      };
+    });
+  }
   
 }).call(this);

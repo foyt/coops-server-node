@@ -91,6 +91,10 @@
           // User may list file users if role of the user in file is either OWNER, WRITER or READER
           checkFileRole(req, res, ['OWNER', 'WRITER', 'READER'], next);   
         break;
+        case 'get-file-revisions':
+          // User may list file revisions, if role of the user in file is either OWNER, WRITER or READER
+          checkFileRole(req, res, ['OWNER', 'WRITER', 'READER'], next);   
+        break;
         case 'update-file-users':
           // User may list file users if role of the user in file is either OWNER, WRITER or READER
           checkFileRole(req, res, ['OWNER', 'WRITER'], next);   

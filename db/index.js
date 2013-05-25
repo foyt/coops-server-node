@@ -57,7 +57,8 @@
     userId: mongoose.Schema.Types.ObjectId,
     revisionNumber: Number,
     patch: String,
-    checksum: Number
+    checksum: Number,
+    created: Date
   });
   
   /* WebSocketTokenSchema */

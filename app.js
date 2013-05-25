@@ -109,6 +109,11 @@ app.patch('/1/users/:userid/files/:fileid', [ passport.authenticate('bearer', { 
 app.get('/1/users/:userid/files/:fileid/users', [ passport.authenticate('bearer', { session: false }), roles.can('get-file-users') ], api.getFileUsers);      
 
 /**
+ * Returns file users
+ */
+app.get('/1/users/:userid/files/:fileid/revisions', [ passport.authenticate('bearer', { session: false }), roles.can('get-file-revisions') ], api.getFileRevisions);      
+
+/**
  * Saves file users
 **/
 app.post('/1/users/:userid/files/:fileid/users', [ passport.authenticate('bearer', { session: false }), roles.can('update-file-users') ], api.updateFileUsers);      

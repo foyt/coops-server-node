@@ -34,9 +34,10 @@
     clients.push(client);
   }
     
-  var Client = function (clientId, fileId, webSocket) {
+  var Client = function (clientId, userId, fileId, webSocket) {
     events.EventEmitter.call(this);
 
+    this._userId = userId;
     this._fileId = fileId;
     this._webSocket = webSocket;
     this._clientId = clientId;
@@ -146,14 +147,15 @@
     },
     
     _createRevision: {
-      value: function (file, userId, revisionNumber, patch, checksum, callback) {
+      value: function (file, userId, revisionNumber, patch, checksum, created, callback) {
         // New revision
         new db.model.FileRevision({ 
           fileId: file._id, 
           userId: userId,
           revisionNumber: revisionNumber, 
           patch: patch, 
-          checksum: checksum 
+          checksum: checksum,
+          created: created
         }).save(function (err, fileRevision) {
           if (err) {
             callback(err, null);
@@ -176,8 +178,9 @@
           var patchResult = _this._applyPatch(patch, fileContent.content);
           if (patchResult.applied) {
             var checksum = crc.crc32(patchResult.patchedText);
+            var created = new Date();
             // Patch applied succesfully
-            _this._createRevision(file, userId, patchRevision + 1, patch, checksum, function (err, fileRevision) {
+            _this._createRevision(file, userId, patchRevision + 1, patch, checksum, created, function (err, fileRevision) {
               if (err) {
                 fileRevision.remove(function () {
                   _this._rejectPatch(patchRevision, "Failed to create revision: " + err);
@@ -242,7 +245,7 @@
           if (err2) {
             webSocket.close(1011, err2);
           } else {
-            var client = new Client(clientId, fileId, webSocket);
+            var client = new Client(clientId, userId, fileId, webSocket);
             webSocket.on('close', function() {
               removeConnectedClient(client);
             });
