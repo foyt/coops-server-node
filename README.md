@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/foyt/coops-server-node.png)](https://travis-ci.org/foyt/coops-server-node)
 Up to date documentation
 ========================
 
