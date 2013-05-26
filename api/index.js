@@ -2,6 +2,7 @@
   
   // Imports
   
+  var diffAlgorithms = require('../diffalgorithms');
   var async = require('async');
   var db = require("../db");
   var crypto = require('crypto');
@@ -156,8 +157,9 @@
       // If initial content is undefined or null we change it to blank
       var content = (reqBody.content === undefined)||(reqBody.content === null) ? '' : reqBody.content;
       var contentType = reqBody.contentType;
+      var now = new Date();
       
-      new db.model.File({ name: name, revisionNumber: 0 }).save(function (err1, file) {
+      new db.model.File({ name: name, revisionNumber: 0, modified: now }).save(function (err1, file) {
         if (err1) {
           res.send(err1, 500);
         } else {
@@ -358,6 +360,7 @@
    * {
    *   "id": "Id of the file",
    *   "name": "Name of the file",
+   *   "modified": "Last modification time of file/file revision ",
    *   "revisionNumber": Revision number of returned file,
    *   "content": "contents of the file or blank if not specified",
    *   "contentType": "mime/type;editor=preferredEditor",
@@ -367,7 +370,6 @@
   module.exports.getUserFile = function(req, res) {
     var userId = req.params.userid;
     var fileId = req.params.fileid;
-    // TODO: Better param name?
     var revision = req.query['revisionNumber'];
     
     if (revision === undefined) {
@@ -386,6 +388,7 @@
                   var response = {
                     id: fileId,
                     revisionNumber: file.revisionNumber,
+                    modified: file.modified,
                     name: file.name,
                     role: fileUser.role,
                     content: fileContent.content,
@@ -401,8 +404,54 @@
         }
       });
     } else {
-      // TODO: Implement
-      res.send("Revision is unimplemented", 500);
+      db.model.File.findOne({ _id: fileId },function (err1, file) {
+        var algorithm = diffAlgorithms.getAlgorithm('dmp');
+        db.model.FileContent.findOne({ fileId: fileId },function (err2, fileContent) {
+          if (err2) {
+            res.send(err2, 500);
+          } else {
+            var currentContent = fileContent.content;
+            db.model.FileUser.findOne({ fileId: fileId, userId: userId }, function (err3, fileUser) {
+              if (err3) {
+                res.send(err3, 500);
+              } else {
+                db.model.FileRevision.find({ revisionNumber: { $gte: revision } }, function (err4, fileRevisions) {
+                  if (err4) {
+                    res.send(err4, 500);
+                  } else {
+                    var resultRevision = null;
+                    var resultCreated = null;
+                    
+                    fileRevisions.reverse().forEach(function (fileRevision) {
+                      var result = algorithm.unpatch(fileRevision.patch, currentContent);
+                      if (result.applied) {
+                        currentContent = result.patchedText;
+                        resultRevision = fileRevision.revisionNumber;
+                        resultCreated = fileRevision.created;
+                      } else {
+                        res.send("Could not apply reverse patch", 500); 
+                      }
+                    }); 
+      
+                    var response = {
+                      id: fileId,
+                      revisionNumber: resultRevision,
+                      modified: resultCreated,
+                      name: file.name,
+                      role: fileUser.role,
+                      content: currentContent,
+                      contentType: fileContent.contentType
+                    };
+                    
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                    res.send(JSON.stringify(response)); 
+                  }
+                });
+              }
+            });
+          }
+        });
+      });
     }
   };
   

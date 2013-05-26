@@ -1,11 +1,10 @@
 (function() {
 
-  var diffMatchPatchMod = require('googlediff');
-  var diffMatchPatch = new diffMatchPatchMod();
   var crc = require('crc');
   var WebSocketServer = require('ws').Server;
   var events = require('events');
   var db = require('./db');
+  var diffAlgorithms = require('./diffalgorithms');
   
   var connectedClients = new Object();
   
@@ -85,6 +84,7 @@
         }));
       }
     },
+    /**
     _applyPatch: {
       value: function(patch, text) {
         var patchApplied = true;
@@ -106,7 +106,7 @@
         };
       }
     },
-    
+    **/
     _sendRevisionToClients: {
       value: function (fileRevision) {
         var clients = getConnectedClients(fileRevision.fileId);
@@ -174,33 +174,44 @@
       value: function (file, userId, patchRevision, patch) {
         var _this = this;
         
-        db.model.FileContent.findOne({ 'fileId': file._id}, function (err, fileContent) {
-          var patchResult = _this._applyPatch(patch, fileContent.content);
-          if (patchResult.applied) {
-            var checksum = crc.crc32(patchResult.patchedText);
-            var created = new Date();
-            // Patch applied succesfully
-            _this._createRevision(file, userId, patchRevision + 1, patch, checksum, created, function (err, fileRevision) {
-              if (err) {
-                fileRevision.remove(function () {
-                  _this._rejectPatch(patchRevision, "Failed to create revision: " + err);
-                });
-              } else {
-                fileContent.content = patchResult.patchedText;
-                fileContent.save(function (err, fileContent) {
-                  if (err) {
-                    fileRevision.remove(function () {
-                      _this._rejectPatch(patchRevision, "Failed to persist content: " + err);
-                    });
-                  } else {
-                    _this._sendRevisionToClients(fileRevision);
-                  }
-                });
-              }
-            });
+        db.model.FileContent.findOne({ 'fileId': file._id}, function (err1, fileContent) {
+          if (err1) {
+            _this._rejectPatch(patchRevision, "Internal Server Error:" + err1);
           } else {
-            // Patching failed, so we reject the patch
-            _this._rejectPatch(patchRevision, "Failed to apply patch");
+            var patchResult = diffAlgorithms.getAlgorithm('dmp').patch(patch, fileContent.content);
+            if (patchResult.applied) {
+              var checksum = crc.crc32(patchResult.patchedText);
+              var patchCreated = new Date();
+              // Patch applied succesfully
+              _this._createRevision(file, userId, patchRevision + 1, patch, checksum, patchCreated, function (err2, fileRevision) {
+                if (err2) {
+                  _this._rejectPatch(patchRevision, "Internal Server Error:" + err2);
+                } else {
+                  fileContent.content = patchResult.patchedText;
+                  fileContent.save(function (err3, fileContent) {
+                    if (err3) {
+                      fileRevision.remove(function () {
+                        _this._rejectPatch(patchRevision, "Internal Server Error:" + err3);
+                      });
+                    } else {
+                      file.modified = patchCreated;
+                      file.save(function (err4, updatedFile) {
+                        if (err4) {
+                          fileRevision.remove(function () {
+                            _this._rejectPatch(patchRevision, "Internal Server Error:" + err3);
+                          });
+                        } else {
+                          _this._sendRevisionToClients(fileRevision);
+                        }
+                      })
+                    }
+                  });
+                }
+              });
+            } else {
+              // Patching failed, so we reject the patch
+              _this._rejectPatch(patchRevision, "Failed to apply patch");
+            }
           }
         });
       }

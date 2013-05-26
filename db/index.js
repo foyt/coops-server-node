@@ -33,6 +33,7 @@
   
   var FileSchema = mongoose.Schema({
     name: String,
+    modified: Date,
     revisionNumber: Number
   });
   
