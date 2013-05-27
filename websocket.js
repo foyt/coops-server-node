@@ -84,29 +84,7 @@
         }));
       }
     },
-    /**
-    _applyPatch: {
-      value: function(patch, text) {
-        var patchApplied = true;
-        var diffs = diffMatchPatch.patch_fromText(patch);
-        var result = diffMatchPatch.patch_apply(diffs, text);
-        for (var j = 0, jl = result[1].length; j < jl; j++) {
-          if (result[1][j] == false) {
-            patchApplied = false;
-          }
-        }
-        
-        if (patchApplied) {
-          text = result[0];
-        }
-        
-        return {
-          applied: patchApplied,
-          patchedText: text
-        };
-      }
-    },
-    **/
+    
     _sendRevisionToClients: {
       value: function (fileRevision) {
         var clients = getConnectedClients(fileRevision.fileId);

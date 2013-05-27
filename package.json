@@ -1,13 +1,13 @@
 {
   "author": "Antti Leppä / Foyt",
   "name": "coops-server-node",
-  "version": "0.0.1-13",
+  "version": "0.0.2",
   "repository": {
     "type": "git",
     "url": "git://github.com/foyt/coops-server-node.git"
   },
   "engines": {
-    "node": ">0.10.0"
+    "node": ">=0.10.0"
   },
   "dependencies": {
     "express": "3.x",
