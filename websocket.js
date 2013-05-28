@@ -224,7 +224,7 @@
               } else {
                 var client = new Client(clientId, userId, fileId, file.revisionNumber, webSocket);
                 webSocket.on('close', function() {
-                  deinitialize.destroy();
+                  webSocket.deinitialize();
                 });
                 
                 console.log("Client connected.");
