@@ -21,6 +21,10 @@
       _this._onWebSocketMessage(data, flags);
     });
     
+    this._webSocket.on('close', function() {
+      _this.deinitialize();
+    });
+
     this.on("receivePatch", function (event) {
       _this._onReceivePatch(event);
     });
@@ -223,10 +227,6 @@
                 webSocket.close(1011, err3);
               } else {
                 var client = new Client(clientId, userId, fileId, file.revisionNumber, webSocket);
-                webSocket.on('close', function() {
-                  webSocket.deinitialize();
-                });
-                
                 console.log("Client connected.");
               }
             });           
