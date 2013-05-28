@@ -56,6 +56,7 @@
   var FileRevisionSchema = mongoose.Schema({
     fileId: mongoose.Schema.Types.ObjectId,
     userId: mongoose.Schema.Types.ObjectId,
+    clientId: String,
     revisionNumber: Number,
     patch: String,
     checksum: Number,
@@ -79,6 +80,16 @@
       FileRevision: mongoose.model('FileRevision', FileRevisionSchema),
       FileUser: mongoose.model('FileUser', FileUserSchema),
       WebSocketToken: mongoose.model('WebSocketToken', WebSocketTokenSchema)
+    },
+    schema: {
+      AccessToken: AccessTokenSchema,
+      Client: ClientSchema,
+      User: UserSchema,
+      File: FileSchema,
+      FileContent: FileContentSchema,
+      FileRevision: FileRevisionSchema,
+      FileUser: FileUserSchema,
+      WebSocketToken: WebSocketTokenSchema
     }
   };
   

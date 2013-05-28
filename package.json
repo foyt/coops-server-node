@@ -19,7 +19,7 @@
     "passport-oauth2-client-password": "0.1.x",
     "jade": "*",
     "underscore": "*",
-    "ws": "0.4.25",
+    "ws": "0.4.26",
     "googlediff": "0.1.0",
     "crc": "0.2.0",
     "async": "0.2.8"

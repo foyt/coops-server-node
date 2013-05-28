@@ -5,39 +5,14 @@
   var events = require('events');
   var db = require('./db');
   var diffAlgorithms = require('./diffalgorithms');
-  
-  var connectedClients = new Object();
-  
-  function getConnectedClients(fileId) {
-    return connectedClients[fileId];
-  }
-  
-  function removeConnectedClient(client) {
-    var clients = connectedClients[client.getFileId()];
+  var _ = require('underscore');
 
-    for (var i = clients.length - 1; i >= 0; i--) {
-      if (clients[i] === client) {
-        clients.splice(i, 1);
-        break;
-      }
-    }
-    
-    client.deinitialize(); 
-  }
-   
-  function addConnectedClient(client) {
-    var clients = connectedClients[client.getFileId()];
-    if (clients == null) {
-      connectedClients[client.getFileId()] = clients = new Array();
-    }
-    clients.push(client);
-  }
-    
-  var Client = function (clientId, userId, fileId, webSocket) {
+  var Client = function (clientId, userId, fileId, revisionNumber, webSocket) {
     events.EventEmitter.call(this);
 
     this._userId = userId;
     this._fileId = fileId;
+    this._currentRevision = revisionNumber;
     this._webSocket = webSocket;
     this._clientId = clientId;
     
@@ -49,6 +24,25 @@
     this.on("receivePatch", function (event) {
       _this._onReceivePatch(event);
     });
+    
+    // Poll for changes new revisions in the database
+    var _this = this;
+    this._changePoller = setInterval(function () {
+      db.model.FileRevision.find({ 'revisionNumber' : { $gt: _this._currentRevision }, 'fileId': _this._fileId  }, function (err, fileRevisions) {
+        fileRevisions.forEach(function (fileRevision) {
+          _this._sendRevision(fileRevision);
+          _this._currentRevision = fileRevision.revisionNumber; 
+        });
+      });
+    }, 300);
+    
+    // Listen for local changes
+    db.schema.FileRevision.post('save', function (fileRevision) {
+      if (fileRevision.revisionNumber > _this._currentRevision) {
+        _this._sendRevision(fileRevision);
+        _this._currentRevision = fileRevision.revisionNumber; 
+      }
+    })
   };
   
   Client.super_ = events.EventEmitter;
@@ -60,6 +54,7 @@
     },
     deinitialize: {
       value: function () {
+        clearInterval(this._changePoller);
       }
     },
     getWebSocket: {
@@ -72,26 +67,16 @@
         return this._fileId;
       }
     },
-    sendRevision: {
-      value: function(clientId, fileRevision) {
+    _sendRevision: {
+      value: function(fileRevision) {
         this._webSocket.send(JSON.stringify({
           type: 'patch',
           userId: fileRevision.userId,
-          clientId: clientId,
+          clientId: fileRevision.clientId,
           patch: fileRevision.patch,
           revisionNumber: fileRevision.revisionNumber,
           checksum: fileRevision.checksum
         }));
-      }
-    },
-    
-    _sendRevisionToClients: {
-      value: function (fileRevision) {
-        var clients = getConnectedClients(fileRevision.fileId);
-      
-        for (var i = clients.length - 1; i >= 0; i--) {
-          clients[i].sendRevision(this._clientId, fileRevision);
-        }
       }
     },
     
@@ -133,7 +118,8 @@
           revisionNumber: revisionNumber, 
           patch: patch, 
           checksum: checksum,
-          created: created
+          created: created,
+          clientId: this._clientId
         }).save(function (err, fileRevision) {
           if (err) {
             callback(err, null);
@@ -178,8 +164,6 @@
                           fileRevision.remove(function () {
                             _this._rejectPatch(patchRevision, "Internal Server Error:" + err3);
                           });
-                        } else {
-                          _this._sendRevisionToClients(fileRevision);
                         }
                       })
                     }
@@ -234,17 +218,18 @@
           if (err2) {
             webSocket.close(1011, err2);
           } else {
-            var client = new Client(clientId, userId, fileId, webSocket);
-            webSocket.on('close', function() {
-              removeConnectedClient(client);
-            });
-            
-            addConnectedClient(client);
-            
-            console.log("Client connected. Client count " + getConnectedClients(fileId).length);
-            console.log("  fileId:" + fileId); 
-            console.log("  userId:" + userId); 
-            console.log("  clientId:" + clientId);            
+            db.model.File.findOne({ '_id': fileId }, function (err3, file) {
+              if (err3) {
+                webSocket.close(1011, err3);
+              } else {
+                var client = new Client(clientId, userId, fileId, file.revisionNumber, webSocket);
+                webSocket.on('close', function() {
+                  // TODO: Socket close
+                });
+                
+                console.log("Client connected.");
+              }
+            });           
           }
         });
       } else {
