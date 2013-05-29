@@ -2,14 +2,11 @@
 
   var crc = require('crc');
   var WebSocketServer = require('ws').Server;
-  var events = require('events');
   var db = require('./db');
   var diffAlgorithms = require('./diffalgorithms');
   var _ = require('underscore');
 
   var Client = function (clientId, userId, fileId, revisionNumber, webSocket) {
-    events.EventEmitter.call(this);
-
     this._userId = userId;
     this._fileId = fileId;
     this._currentRevision = revisionNumber;
@@ -18,15 +15,12 @@
     
     var _this = this;
     this._webSocket.on('message', function (data, flags) {
+      console.log("Received a websocket message");
       _this._onWebSocketMessage(data, flags);
     });
     
     this._webSocket.on('close', function() {
       _this.deinitialize();
-    });
-
-    this.on("receivePatch", function (event) {
-      _this._onReceivePatch(event);
     });
     
     // Poll for changes new revisions in the database
@@ -39,19 +33,9 @@
         });
       });
     }, 300);
-    
-    // Listen for local changes
-    db.schema.FileRevision.post('save', function (fileRevision) {
-      if (fileRevision.revisionNumber > _this._currentRevision) {
-        _this._sendRevision(fileRevision);
-        _this._currentRevision = fileRevision.revisionNumber; 
-      }
-    })
   };
   
-  Client.super_ = events.EventEmitter;
-  
-  Client.prototype = Object.create(events.EventEmitter.prototype, {
+  Client.prototype = Object.create(null, {
     constructor: {
       value: Client,
       enumerable: false
@@ -93,13 +77,36 @@
         
         switch (json.type) {
           case 'patch':
-            this.emit("receivePatch", {
-              patch: json.patch,
-              revisionNumber: json.revisionNumber,
-              userId: userId
-            });
+            this._handlePatchMessage(json.patch, json.revisionNumber, userId);
+          break;
+          default:
+            console.log("Received an unknown websocket message");
           break;
         }
+      }
+    },
+    
+    _handlePatchMessage: {
+      value: function (patch, patchRevision, userId) {
+        console.log("Received patch from " + userId + " for revision " + patchRevision);
+        
+        var _this = this;
+        db.model.File.findOne({ '_id': this._fileId }, function (err, file) {
+          if (err) {
+            console.err("Error occurred while finding a file" + err);
+            _this._rejectPatch(patchRevision, "Could not find file: " + err);
+          } else {
+            if (file.revisionNumber == patchRevision) {
+              console.log("Patch ok, patching file");
+              // Patch is to this revision so we can accept it
+              _this._patchFile(file, userId, patchRevision, patch);          
+            } else {
+              console.log("Out of sync, rejecting patch " + patchRevision + ' != ' + file.revisionNumber);
+              // Patch is not to this revision, so we reject it
+              _this._rejectPatch(patchRevision, "Out of sync");
+            }
+          }
+        });
       }
     },
 
@@ -125,15 +132,7 @@
           created: created,
           clientId: this._clientId
         }).save(function (err, fileRevision) {
-          if (err) {
-            callback(err, null);
-          } else {
-            // Update document revision
-            file.revisionNumber = revisionNumber;
-            file.save(function (err, file) {
-              callback(err, fileRevision);
-            });
-          }
+          callback(err, fileRevision);
         });
       }
     },
@@ -151,7 +150,8 @@
               var checksum = crc.crc32(patchResult.patchedText);
               var patchCreated = new Date();
               // Patch applied succesfully
-              _this._createRevision(file, userId, patchRevision + 1, patch, checksum, patchCreated, function (err2, fileRevision) {
+              var patchedRevision = patchRevision + 1;
+              _this._createRevision(file, userId, patchedRevision, patch, checksum, patchCreated, function (err2, fileRevision) {
                 if (err2) {
                   _this._rejectPatch(patchRevision, "Internal Server Error:" + err2);
                 } else {
@@ -163,6 +163,8 @@
                       });
                     } else {
                       file.modified = patchCreated;
+                      file.revisionNumber = patchedRevision;
+                      
                       file.save(function (err4, updatedFile) {
                         if (err4) {
                           fileRevision.remove(function () {
@@ -181,28 +183,6 @@
           }
         });
       }
-    },
-    
-    _onReceivePatch: {
-      value: function (event) {
-  	    var patch = event.patch;
-  	    var patchRevision = event.revisionNumber;
-  	    var userId = event.userId;
-  	    var _this = this;
-  	    db.model.File.findOne({ '_id': this._fileId }, function (err, file) {
-  	      if (err) {
-  	        _this._rejectPatch(patchRevision, "Could not find file: " + err);
-  	      } else {
-  	        if (file.revisionNumber == patchRevision) {
-  	          // Patch is to this revision so we can accept it
-  	          _this._patchFile(file, userId, patchRevision, patch);          
-  	        } else {
-  	          // Patch is not to this revision, so we reject it
-  	          _this._rejectPatch(patchRevision, "Out of sync");
-  	        }
-  	      }
-  	    });
-  	  }
     }
   });
   
