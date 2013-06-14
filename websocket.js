@@ -79,6 +79,9 @@
           case 'patch':
             this._handlePatchMessage(json.patch, json.revisionNumber, userId);
           break;
+          case 'revert':
+            this._handleRevertMessage();
+          break;
           default:
             console.log("Received an unknown websocket message");
           break;
@@ -105,6 +108,31 @@
               // Patch is not to this revision, so we reject it
               _this._rejectPatch(patchRevision, "Out of sync");
             }
+          }
+        });
+      }
+    },
+    
+    _handleRevertMessage: {
+      value: function () {
+        console.log("Received revert request");
+        var _this = this;
+        db.model.File.findOne({ '_id': this._fileId }, function (err1, file) {
+          if (err1) {
+            console.err(err1);
+          } else {
+            db.model.FileContent.findOne({ 'fileId': _this._fileId }, function (err2, fileContent) {
+              if (err2) {
+                console.err(err2);
+              } else {
+                _this._webSocket.send(JSON.stringify({
+                  type: 'revert',
+                  revisionNumber: file.revisionNumber,
+                  content: fileContent.content,
+                  contentType: fileContent.contentType
+                }));
+              }
+            });
           }
         });
       }
