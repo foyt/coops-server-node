@@ -415,7 +415,7 @@
               if (err3) {
                 res.send(err3, 500);
               } else {
-                db.model.FileRevision.find({ revisionNumber: { $gte: revision } }, function (err4, fileRevisions) {
+                db.model.FileRevision.find({ fileId: fileId, revisionNumber: { $gte: revision } }, function (err4, fileRevisions) {
                   if (err4) {
                     res.send(err4, 500);
                   } else {
