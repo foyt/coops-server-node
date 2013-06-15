@@ -61,6 +61,13 @@
           patchedText: text
         };
       }
+    },
+    makePatch: {
+      value: function(original, modified) {
+        var diff = diffMatchPatch.diff_main(original, modified);
+        diffMatchPatch.diff_cleanupEfficiency(diff);
+        return diffMatchPatch.patch_toText(diffMatchPatch.patch_make(original, diff));
+      }
     }
   });
   
