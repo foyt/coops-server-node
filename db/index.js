@@ -26,7 +26,6 @@
   /* UserSchema */
   
   var UserSchema = mongoose.Schema({
-    name: String
   });
 
   /* FileSchema */

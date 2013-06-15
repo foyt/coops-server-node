@@ -65,7 +65,7 @@ app.get('/1/users', [ passport.authenticate('bearer', { session: false }), roles
 app.post('/1/users', [passport.authenticate(['basic', 'oauth2-client-password'], { session: false })], api.createUser);
 
 /**
- * Returns user info
+ * Returns user
  */
 app.get('/1/users/:userid', [ passport.authenticate('bearer', { session: false }), roles.can('get-user-info') ], api.getUser);
 

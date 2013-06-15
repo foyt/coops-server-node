@@ -18,50 +18,98 @@
     
   // Exports
   
+  /**
+   * Creates new user.
+   * 
+   * Expects following JSON object in request body (User without id):
+   * 
+   * {
+   * }
+   * 
+   * Returns following JSON string (User):
+   * 
+   * {
+   *   "id": "id of created user"
+   * }
+   */
   module.exports.createUser = function (req, res) {
-    var name = req.body['name'];
     var client = req.user;
     
-    var user = new db.model.User();
-    user.name = name;
-    user.save(function (err, newUser) {
-      if (err) {
-        res.send(err, 500);
-      } else {
-        var expireTime = 1000 * 60 * 60 * 24;
-        var accessToken = new db.model.AccessToken();
-        accessToken.token = crypto.randomBytes(64).toString('hex');
-        accessToken.refreshToken = crypto.randomBytes(64).toString('hex');
-        accessToken.userId = newUser._id;
-        accessToken.clientId = client._id;
-        accessToken.expires = expireTime + new Date().getTime();
-        
-        accessToken.save(function (err, newAccessToken) {
-          var response = {
-            "user_id": newAccessToken.userId,
-            "access_token": {
-              "access_token": newAccessToken.token,
-              "token_type":"Bearer",
-              "expires_in":  newAccessToken.expires - new Date().getTime(),
-              "refresh_token": newAccessToken.refreshToken
-            } 
-          };
-
-          res.setHeader('Content-Type', 'application/json; charset=utf-8');
-          res.send(JSON.stringify(response));
-        });
-      }
-    });   
+    var reqBody = req.body;
+    var valid = true;
+    var message = null;
+    var status = 200;
+    
+    if (!reqBody) {
+      valid = false;
+      message = "Invalid request";
+      status = 400;
+    } 
+    
+    if (valid && (reqBody.id !== undefined)) {
+      valid = false;
+      message = "Cannot specify an id when creating new user";
+      status = 400;
+    }
+    
+    if (valid) { 
+      var user = new db.model.User();
+      user.save(function (err, newUser) {
+        if (err) {
+          res.send(err, 500);
+        } else {
+          var expireTime = 1000 * 60 * 60 * 24;
+          var accessToken = new db.model.AccessToken();
+          accessToken.token = crypto.randomBytes(64).toString('hex');
+          accessToken.refreshToken = crypto.randomBytes(64).toString('hex');
+          accessToken.userId = newUser._id;
+          accessToken.clientId = client._id;
+          accessToken.expires = expireTime + new Date().getTime();
+          
+          accessToken.save(function (err, newAccessToken) {
+            var response = {
+              "id": newAccessToken.userId,
+              "access_token": {
+                "access_token": newAccessToken.token,
+                "token_type":"Bearer",
+                "expires_in":  newAccessToken.expires - new Date().getTime(),
+                "refresh_token": newAccessToken.refreshToken
+              } 
+            };
+  
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.send(JSON.stringify(response));
+          });
+        }
+      });   
+    } else {
+      res.send(message, status);
+    }
   };
 
+  /**
+   * Lists users. 
+   * 
+   * Returns array of users (array of User):
+   * 
+   *  [
+   *    {
+   *     "id": "id of user"
+   *    }, 
+   *    ...
+   *  ]
+   */  
   module.exports.getUsers = function(req, res) {
     db.model.User.find(function (err, users) {
       if (err) {
         res.send(err, 500);
       } else {
-        var response = {
-          userIds: _.pluck(users, "_id")
-        };
+        var response = new Array();
+        users.forEach(function (user) {
+          response.push({
+            id: user._id
+          });
+        });
 
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.send(JSON.stringify(response));
@@ -69,6 +117,16 @@
     });
   };
   
+  /**
+   * Returns a user.
+   * 
+   * 
+   * Returns following JSON string (single User entity):
+   * 
+   * {
+   *   "id": "id of user"
+   * }
+   */
   module.exports.getUser = function(req, res) {
     var userId = req.params.userid;
     
@@ -77,8 +135,7 @@
         res.send(err, 500);
       } else {
         var response = {
-          userId: user._id,
-          name: user.name
+          id: user._id
         };
         
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -90,10 +147,12 @@
   /**
    * Creates new file.
    * 
-   * Expects following JSON object in request body:
+   * Expects following JSON object in request body (File without id and modified):
    * 
    * {
+   *   "revisionNumber": 0,
    *   "name": "Name of the file",
+   *   "role": "OWNER",
    *   "content": "contents of the file (optional)",
    *   "contentType": "mime/type;editor=preferredEditor"
    * }
@@ -106,7 +165,8 @@
    *   "name": "Name of the file",
    *   "role": "OWNER",
    *   "content": "contents of the file or blank if not specified",
-   *   "contentType": "mime/type;editor=preferredEditor"
+   *   "contentType": "mime/type;editor=preferredEditor",
+   *   "modified": "Last modification time of file"
    * }
    */
   module.exports.createUserFile = function(req, res) {
@@ -123,19 +183,19 @@
     
     if (valid && (reqBody.id !== undefined)) {
       valid = false;
-      message = "Cannot specify a id when creating a new file";
+      message = "Cannot specify an id when creating new file";
       status = 400;
     }
     
-    if (valid && (reqBody.revisionNumber !== undefined)) {
+    if (valid && (reqBody.revisionNumber !== 0)) {
       valid = false;
-      message = "Cannot specify a revisionNumber when creating a new file";
+      message = "revisionNumber must be 0 when creating new file";
       status = 400;
     }
     
-    if (valid && (reqBody.role !== undefined)) {
+    if (valid && (reqBody.role !== 'OWNER')) {
       valid = false;
-      message = "Cannot specify a role when creating a new file";
+      message = "Role must be OWNER when creating new file";
       status = 400;
     }
     
@@ -196,7 +256,7 @@
   /**
    * Lists user files. 
    * 
-   * Returns array of user files:
+   * Returns array of user files (array of CompactFile):
    * 
    *  [
    *    {
@@ -248,14 +308,7 @@
    *   algorithm=Used difference algorithm
    *   protocolVersion=Used protocol version
    *   
-   * 
-   * {
-   *   "name": "Name of the file",
-   *   "content": "contents of the file (optional)",
-   *   "contentType": "mime/type;editor=preferredEditor"
-   * }
-   * 
-   * Returns following JSON string:
+   * Returns following JSON string (FileJoin):
    * 
    * {
    *   "extensions": ["array", "of", "supported", "extensions"],
@@ -349,13 +402,13 @@
   };
 
   /**
-   * Returns user file
+   * Returns a file
    * 
    * Following query parameters are supported:
    * 
    *   revisionNumber=Return specific revision instead of current revision
    * 
-   * Returns following JSON string:
+   * Returns following JSON string (File):
    * 
    * {
    *   "id": "Id of the file",
@@ -475,6 +528,17 @@
     res.send("Patch doc: " + userId + "," + fileId);
   };
   
+  /**
+   * Returns list of file users
+   * 
+   *  [
+   *    {
+   *      "userId": "Id of user that made the change",
+   *      "role": one of 'OWNER', 'WRITER' or 'READER'
+   *    }, 
+   *    ...
+   *  ]
+   */
   module.exports.getFileUsers = function(req, res) {
     var fileId = req.params.fileid;
     
@@ -496,6 +560,20 @@
     });
   };
   
+  /**
+   * Updates file users
+   * 
+   * Expects array following JSON object in request body (FileUser):
+   * 
+   * [
+   *   {
+   *     "userId": "Id of user that made the change",
+   *     "role": either 'WRITER' or 'READER'
+   *   } 
+   * ]
+   * 
+   * Returns 204 (No Content) if update is a success
+   */
   module.exports.updateFileUsers = function(req, res) {
     var fileId = req.params.fileid;
     var roles = ['OWNER', 'WRITER', 'READER', 'NONE'];
@@ -596,8 +674,7 @@
         		  if (err) {
                 res.send("Could not persist some of the role changes", 500);
       		    } else {
-                res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      		      res.send("{}", 200);
+      		      res.send(204);
       		    }
         		});
       		  }
@@ -612,7 +689,7 @@
   /**
    * Returns file revisions
    * 
-   * Returns array of file revisions:
+   * Returns array of file revisions (single FileRevision entity):
    * 
    *  [
    *    {
