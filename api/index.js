@@ -24,12 +24,18 @@
    * Expects following JSON object in request body (User without id):
    * 
    * {
+   *   "properties": {
+   *     "key": "value"
+   *   }
    * }
    * 
    * Returns following JSON string (User):
    * 
    * {
-   *   "id": "id of created user"
+   *   "id": "id of created user",
+   *   "properties": {
+   *     "key": "value"
+   *   }
    * }
    */
   module.exports.createUser = function (req, res) {
@@ -58,6 +64,8 @@
         if (err) {
           res.send(err, 500);
         } else {
+          var propertySaves = new Array();
+          
           var expireTime = 1000 * 60 * 60 * 24;
           var accessToken = new db.model.AccessToken();
           accessToken.token = crypto.randomBytes(64).toString('hex');
@@ -66,19 +74,45 @@
           accessToken.clientId = client._id;
           accessToken.expires = expireTime + new Date().getTime();
           
-          accessToken.save(function (err, newAccessToken) {
-            var response = {
-              "id": newAccessToken.userId,
-              "access_token": {
-                "access_token": newAccessToken.token,
-                "token_type":"Bearer",
-                "expires_in":  newAccessToken.expires - new Date().getTime(),
-                "refresh_token": newAccessToken.refreshToken
-              } 
+          if (reqBody.properties) {
+            _.keys(reqBody.properties).forEach(function (key) {
+              var value = reqBody.properties[key];
+              var userProperty = new db.model.UserProperty();
+              userProperty.key = key;
+              userProperty.value = value;
+              userProperty.userId = newUser._id;
+              propertySaves.push(function (callback) {
+                userProperty.save(callback);
+              });
+            });
+          }
+
+          async.parallel(propertySaves, function (err, savedPropertyResults) {
+            if (err) {
+              res.send(err, 500);
+            } else {
+              accessToken.save(function (err, newAccessToken) {
+                var responseProperties = new Object();
+                savedPropertyResults.forEach(function (savedPropertyResult) {
+                  var savedProperty = savedPropertyResult[0];
+                  responseProperties[savedProperty.key] = savedProperty.value;
+                });
+
+                var response = {
+                  "id": newAccessToken.userId,
+                  "properties": responseProperties,
+                  "access_token": {
+                    "access_token": newAccessToken.token,
+                    "token_type":"Bearer",
+                    "expires_in":  newAccessToken.expires - new Date().getTime(),
+                    "refresh_token": newAccessToken.refreshToken
+                  } 
+                };
+      
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.send(JSON.stringify(response));
+              });
             };
-  
-            res.setHeader('Content-Type', 'application/json; charset=utf-8');
-            res.send(JSON.stringify(response));
           });
         }
       });   
@@ -90,7 +124,7 @@
   /**
    * Lists users. 
    * 
-   * Returns array of users (array of User):
+   * Returns array of users (array of CompactUser):
    * 
    *  [
    *    {
@@ -124,22 +158,34 @@
    * Returns following JSON string (single User entity):
    * 
    * {
-   *   "id": "id of user"
+   *   "id": "id of user",
+   *   "properties": {
+   *     "key": "value"
+   *   }
    * }
    */
   module.exports.getUser = function(req, res) {
     var userId = req.params.userid;
     
-    db.model.User.findOne({ _id: userId }, function (err, user) {
-      if (err) {
-        res.send(err, 500);
+    db.model.User.findOne({ _id: userId }, function (err1, user) {
+      if (err1) {
+        res.send(err1, 500);
       } else {
-        var response = {
-          id: user._id
-        };
-        
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.send(JSON.stringify(response));
+        db.model.UserProperty.find( { userId: user._id }, function (err2, userProperties) {
+          if (err2) {
+            res.send(err2, 500);
+          } else {
+            var properties = _.object(_.pluck(userProperties, 'key'), _.pluck(userProperties, 'value'));
+
+            var response = {
+              id: user._id,
+              properties: properties
+            };
+            
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.send(JSON.stringify(response));
+          }
+        });
       }
     });
   };
@@ -211,7 +257,7 @@
       status = 400;
     } 
 
-    if  (valid) {
+    if (valid) {
       var userId = req.params.userid;
       var name = reqBody.name;
       // If initial content is undefined or null we change it to blank
@@ -488,7 +534,7 @@
       
                     var response = {
                       id: fileId,
-                      revisionNumber: resultRevision,
+                      revisionNumber: resultRevision||0,
                       modified: resultCreated,
                       name: file.name,
                       role: fileUser.role,

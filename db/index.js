@@ -27,6 +27,14 @@
   
   var UserSchema = mongoose.Schema({
   });
+  
+  /* UserPropertySchema */
+  
+  var UserPropertySchema = mongoose.Schema({
+    userId: mongoose.Schema.Types.ObjectId,
+    key: String,
+    value: String
+  });
 
   /* FileSchema */
   
@@ -35,6 +43,16 @@
     modified: Date,
     revisionNumber: Number
   });
+  
+  /* FilePropertySchema */
+  
+  var FilePropertySchema = mongoose.Schema({
+    fileId: mongoose.Schema.Types.ObjectId,
+    key: String,
+    value: String
+  });
+  
+  /* FileContentSchema */
   
   var FileContentSchema = mongoose.Schema({
     fileId: mongoose.Schema.Types.ObjectId,
@@ -62,6 +80,14 @@
     created: Date
   });
   
+  /* FileRevisionPropertySchema*/
+  
+  var FileRevisionPropertySchema = mongoose.Schema({
+    fileRevisionId: mongoose.Schema.Types.ObjectId,
+    key: String,
+    value: String
+  });
+  
   /* WebSocketTokenSchema */
   
   var WebSocketTokenSchema = mongoose.Schema({
@@ -74,9 +100,12 @@
       AccessToken: mongoose.model('AccessToken', AccessTokenSchema),
       Client: mongoose.model('Client', ClientSchema),
       User: mongoose.model('User', UserSchema),
+      UserProperty: mongoose.model('UserProperty', UserPropertySchema),
       File: mongoose.model('File', FileSchema),
+      FileProperty: mongoose.model('FileProperty', FilePropertySchema),
       FileContent: mongoose.model('FileContent', FileContentSchema),
       FileRevision: mongoose.model('FileRevision', FileRevisionSchema),
+      FileRevisionProperty: mongoose.model('FileRevisionProperty', FileRevisionPropertySchema),
       FileUser: mongoose.model('FileUser', FileUserSchema),
       WebSocketToken: mongoose.model('WebSocketToken', WebSocketTokenSchema)
     },
@@ -84,12 +113,15 @@
       AccessToken: AccessTokenSchema,
       Client: ClientSchema,
       User: UserSchema,
+      UserProperty: UserPropertySchema,
       File: FileSchema,
+      FileProperty: FilePropertySchema,
       FileContent: FileContentSchema,
       FileRevision: FileRevisionSchema,
+      FileRevisionProperty: FileRevisionPropertySchema,
       FileUser: FileUserSchema,
       WebSocketToken: WebSocketTokenSchema
     }
   };
-  
+
 }).call(this);
