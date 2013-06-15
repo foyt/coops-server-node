@@ -173,6 +173,7 @@
           if (err1) {
             _this._rejectPatch(patchRevision, "Internal Server Error:" + err1);
           } else {
+            // Unhardcode algorithm
             var patchResult = diffAlgorithms.getAlgorithm('dmp').patch(patch, fileContent.content);
             if (patchResult.applied) {
               var checksum = crc.crc32(patchResult.patchedText);

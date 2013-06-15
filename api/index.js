@@ -6,6 +6,7 @@
   var async = require('async');
   var db = require("../db");
   var crypto = require('crypto');
+  var crc = require('crc');
   var _ = require('underscore');
   
   // Settings
@@ -153,7 +154,6 @@
   
   /**
    * Returns a user.
-   * 
    * 
    * Returns following JSON string (single User entity):
    * 
@@ -504,6 +504,7 @@
       });
     } else {
       db.model.File.findOne({ _id: fileId },function (err1, file) {
+        // TODO: Unhardcode algorithm
         var algorithm = diffAlgorithms.getAlgorithm('dmp');
         db.model.FileContent.findOne({ fileId: fileId },function (err2, fileContent) {
           if (err2) {
@@ -554,12 +555,125 @@
     }
   };
   
+  /**
+   * Saves a file
+   * 
+   * Expects following JSON object in request body (File):
+   * 
+   * {
+   *   "id": id of the file,
+   *   "name": "Name of the file",
+   *   "content": "contents of the file",
+   *   "contentType": "mime/type;editor=preferredEditor",
+   *   "role": one of 'OWNER', 'WRITER' or 'READER',
+   *   "revisionNumber": expected revision number
+   * }
+   * 
+   * Returns 204 (No Content) if update is a success
+   */
   module.exports.saveUserFile = function(req, res) {
-    // save
-    var userId = req.params.userid;
     var fileId = req.params.fileid;
+    var userId = req.params.userid;
+    var reqBody = req.body;
+    var valid = true;
+    var message = null;
+    var status = 200;
+    
+    if (!reqBody) {
+      valid = false;
+      message = "Invalid request";
+      status = 400;
+    } 
+    
+    if (valid && (reqBody.id !== fileId)) {
+      valid = false;
+      message = "Cannot replace file with another";
+      status = 400;
+    }
 
-    res.send("Save complete doc: " + userId + "," + fileId);
+    if (valid) {
+      db.model.File.findOne({ _id: fileId },function (err1, file) {
+        if (err1) {
+          res.send(err1, 500);
+        } else {
+          if ((reqBody.revisionNumber - 1) !== file.revisionNumber) {
+            valid = false;
+            message = "revisionNumber must be exactly one more than old file when saving";
+            status = 400;
+          }
+          
+          if (valid && ((file.role === 'OWNER') && (reqBody.role !== 'OWNER'))) {
+            valid = false;
+            message = "Cannot change role of the file owner";
+            status = 400;
+          }
+          
+          if (valid) {
+            var now = new Date();
+            
+            file.revisionNumber = reqBody.revisionNumber;
+            file.name = reqBody.name;
+            file.modified = now;
+            
+            db.model.FileContent.findOne({ fileId: file._id }, function (err2, fileContent) {
+              if (err2) {
+                res.send(err2, 500);
+              } else {
+                var saves = new Array();
+                
+                if ((fileContent.content !== reqBody.content)||(fileContent.contentType !== reqBody.contentType)) {
+                  if (fileContent.content !== reqBody.content) {
+                    // TODO: Unhardcode algorithm
+                    var algorithm = diffAlgorithms.getAlgorithm('dmp');
+                    var patch = algorithm.makePatch(fileContent.content, reqBody.content);
+                    var checksum = crc.crc32(reqBody.content);
+                    
+                    var fileRevision = new db.model.FileRevision({ 
+                      fileId: file._id, 
+                      userId: userId,
+                      revisionNumber: reqBody.revisionNumber, 
+                      patch: patch, 
+                      checksum: checksum,
+                      created: now,
+                      clientId: -1
+                    });
+                    
+                    saves.push(function (callback) {
+                      fileRevision.save(callback);
+                    });
+                  }
+
+                  fileContent.content = reqBody.content;
+                  fileContent.contentType = reqBody.contentType;
+                  
+                  saves.push(function (callback) {
+                    fileContent.save(callback);
+                  });
+                }
+
+                saves.push(function (callback) {
+                  file.save(callback);
+                });
+                
+                async.parallel(saves, function (err3, saveResults) {
+                  // TODO: Rollback...
+                  if (err3) {
+                    res.send(err3, 500);
+                  } else {
+                    res.send(204);
+                  }
+                });
+              }
+            });
+
+          } else {
+            res.send(message, status);
+          }
+        }
+      });
+    } else {
+      res.send(message, status);
+    }
   };
   
   module.exports.patchUserFile = function(req, res) {
