@@ -574,6 +574,7 @@
   module.exports.saveUserFile = function(req, res) {
     var fileId = req.params.fileid;
     var userId = req.params.userid;
+    var user = req.user;
     var reqBody = req.body;
     var valid = true;
     var message = null;
@@ -588,6 +589,12 @@
     if (valid && (reqBody.id !== fileId)) {
       valid = false;
       message = "Cannot replace file with another";
+      status = 400;
+    }
+    
+    if (valid && (user.id != userId)) {
+      valid = false;
+      message = "Cannot update file of another user";
       status = 400;
     }
 
@@ -677,15 +684,173 @@
   };
   
   module.exports.patchUserFile = function(req, res) {
-    // patch
-    // json post: revision
-    // json post: patch
-    // json post: properties
-    
     var userId = req.params.userid;
     var fileId = req.params.fileid;
+    var user = req.user;
+    var reqBody = req.body;
+    var valid = true;
+    var message = null;
+    var status = 200;
+    
+    if (!reqBody) {
+      valid = false;
+      message = "Invalid request";
+      status = 400;
+    } 
+    
+    if (valid && (user.id != userId)) {
+      valid = false;
+      message = "Cannot update file of another user";
+      status = 400;
+    }
+    
+    if (reqBody.patch) {
+      if (valid && (!reqBody.algorithm)) {
+        valid = false;
+        message = "Algorithm is required when applying patch";
+        status = 400;
+      }
+      
+      if (!diffAlgorithms.isAlgorithmAvailable(reqBody.algorithm)) {
+        valid = false;
+        message = "Algorithm is not supported by this server";
+        status = 400;
+      }
+    }
 
-    res.send("Patch doc: " + userId + "," + fileId);
+    if (valid) {
+      db.model.File.findOne({ _id: fileId },function (err1, file) {
+        if (err1) {
+          res.send(err1, 500);
+        } else {
+          if ((reqBody.revisionNumber - 1) !== file.revisionNumber) {
+            valid = false;
+            message = "revisionNumber must be exactly one more than old file when patching";
+            status = 400;
+          }
+          
+          if (valid && ((file.role === 'OWNER') && (reqBody.role !== 'OWNER'))) {
+            valid = false;
+            message = "Cannot change role of the file owner";
+            status = 400;
+          }
+          
+          if (valid) {
+            var now = new Date();
+            
+            file.revisionNumber = reqBody.revisionNumber;
+            file.modified = now;
+
+            if (reqBody.name) {
+              file.name = reqBody.name;
+            }
+            
+            db.model.FileContent.findOne({ fileId: file._id }, function (err2, fileContent) {
+              var content = fileContent.content;
+              
+              if (reqBody.patch) {
+                var patchResult = diffAlgorithms.getAlgorithm(reqBody.algorithm).patch(reqBody.patch, content);
+                if (patchResult.applied) {
+                  content = patchResult.patchedText;
+                } else {
+                  valid = false;
+                  message = "Could not apply the patch";
+                  status = 500;
+                }
+              }
+
+              if (valid) {
+                var propertySaves = new Array();
+                
+                var fileRevision = new db.model.FileRevision({ 
+                  fileId: file._id, 
+                  userId: userId,
+                  revisionNumber: reqBody.revisionNumber, 
+                  patch: reqBody.patch, 
+                  checksum: crc.crc32(content),
+                  created: now,
+                  clientId: -1
+                });
+                
+                fileRevision.save(function (err3, savedRevision) {
+                  // TODO: Rollback...
+                  if (err3) {
+                    res.send(err3, 500);
+                  } else {
+                    if (reqBody.properties) {
+                      var propertyKeys = _.keys(reqBody.properties);
+                      
+                      db.model.FileProperty.find({ 'key': { $in: propertyKeys }, 'fileId': file._id }, function (err4, fileProperties) {
+                        if (err4) {
+                          res.send(err4, 500);
+                        } else {
+                          var existingFileProperties = _.object(_.pluck(fileProperties, 'key'), fileProperties);
+                          propertyKeys.forEach(function (key) {
+                            var value = reqBody.properties[key];
+
+                            // File Property
+                            var fileProperty = existingFileProperties[key];
+                            if (fileProperty) {
+                              // Property already exists
+                              if (fileProperty.value != value) {
+                                fileProperty.value = value;
+                                propertySaves.push(function (callback) {
+                                  fileProperty.save(callback);
+                                });
+                              }
+                            } else {
+                              // Property does not exist
+                              
+                              fileProperty = new db.model.FileProperty();
+                              fileProperty.key = key;
+                              fileProperty.value = value;
+                              fileProperty.fileId = file._id;
+                              
+                              propertySaves.push(function (callback) {
+                                fileProperty.save(callback);
+                              });
+                            }
+                            
+                            // Revision Property
+                            var revisionProperty = new db.model.FileRevisionProperty();
+                            revisionProperty.key = key;
+                            revisionProperty.value = value;
+                            revisionProperty.fileRevisionId = savedRevision._id;
+                            propertySaves.push(function (callback) {
+                              revisionProperty.save(callback);
+                            });
+                          });
+
+                          fileContent.save(function (err4, savedContent) {
+                            if (err4) {
+                              res.send(err4, 500);
+                            } else {
+                              async.parallel(propertySaves, function (err5, saveResults) {
+                                if (err5) {
+                                  res.send(err5, 500);
+                                } else {
+                                  res.send(204);
+                                }
+                              });
+                            }
+                          });
+                        }
+                      });
+                    }
+                  }
+                });
+              } else {
+                res.send(message, status);
+              }
+            });
+          } else {
+            res.send(message, status);
+          }
+        }
+      });
+    } else {
+      res.send(message, status);
+    }
   };
   
   /**
