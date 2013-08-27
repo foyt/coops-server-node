@@ -777,66 +777,70 @@
                   if (err3) {
                     res.send(err3, 500);
                   } else {
-                    if (reqBody.properties) {
-                      var propertyKeys = _.keys(reqBody.properties);
-                      
-                      db.model.FileProperty.find({ 'key': { $in: propertyKeys }, 'fileId': file._id }, function (err4, fileProperties) {
-                        if (err4) {
-                          res.send(err4, 500);
-                        } else {
-                          var existingFileProperties = _.object(_.pluck(fileProperties, 'key'), fileProperties);
-                          propertyKeys.forEach(function (key) {
-                            var value = reqBody.properties[key];
+                    var propertyKeys = _.keys(reqBody.properties||{});
+                    
+                    db.model.FileProperty.find({ 'key': { $in: propertyKeys }, 'fileId': file._id }, function (err4, fileProperties) {
+                      if (err4) {
+                        res.send(err4, 500);
+                      } else {
+                        var existingFileProperties = _.object(_.pluck(fileProperties, 'key'), fileProperties);
+                        propertyKeys.forEach(function (key) {
+                          var value = reqBody.properties[key];
 
-                            // File Property
-                            var fileProperty = existingFileProperties[key];
-                            if (fileProperty) {
-                              // Property already exists
-                              if (fileProperty.value != value) {
-                                fileProperty.value = value;
-                                propertySaves.push(function (callback) {
-                                  fileProperty.save(callback);
-                                });
-                              }
-                            } else {
-                              // Property does not exist
-                              
-                              fileProperty = new db.model.FileProperty();
-                              fileProperty.key = key;
+                          // File Property
+                          var fileProperty = existingFileProperties[key];
+                          if (fileProperty) {
+                            // Property already exists
+                            if (fileProperty.value != value) {
                               fileProperty.value = value;
-                              fileProperty.fileId = file._id;
-                              
                               propertySaves.push(function (callback) {
                                 fileProperty.save(callback);
                               });
                             }
+                          } else {
+                            // Property does not exist
                             
-                            // Revision Property
-                            var revisionProperty = new db.model.FileRevisionProperty();
-                            revisionProperty.key = key;
-                            revisionProperty.value = value;
-                            revisionProperty.fileRevisionId = savedRevision._id;
+                            fileProperty = new db.model.FileProperty();
+                            fileProperty.key = key;
+                            fileProperty.value = value;
+                            fileProperty.fileId = file._id;
+                            
                             propertySaves.push(function (callback) {
-                              revisionProperty.save(callback);
+                              fileProperty.save(callback);
                             });
+                          }
+                          
+                          // Revision Property
+                          var revisionProperty = new db.model.FileRevisionProperty();
+                          revisionProperty.key = key;
+                          revisionProperty.value = value;
+                          revisionProperty.fileRevisionId = savedRevision._id;
+                          propertySaves.push(function (callback) {
+                            revisionProperty.save(callback);
                           });
+                        });
 
-                          fileContent.save(function (err4, savedContent) {
-                            if (err4) {
-                              res.send(err4, 500);
-                            } else {
-                              async.parallel(propertySaves, function (err5, saveResults) {
-                                if (err5) {
-                                  res.send(err5, 500);
-                                } else {
-                                  res.send(204);
-                                }
-                              });
-                            }
-                          });
-                        }
-                      });
-                    }
+                        fileContent.save(function (err4, savedContent) {
+                          if (err4) {
+                            res.send(err4, 500);
+                          } else {
+                            file.save(function (err5, savedFile) {
+                              if (err5) {
+                                res.send(err5, 500);
+                              } else {
+                                async.parallel(propertySaves, function (err6, saveResults) {
+                                  if (err6) {
+                                    res.send(err6, 500);
+                                  } else {
+                                    res.send(204);
+                                  }
+                                });
+                              };
+                            });
+                          }
+                        });
+                      }
+                    });
                   }
                 });
               } else {
