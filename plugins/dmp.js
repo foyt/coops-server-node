@@ -12,6 +12,11 @@
       value: DmpDifferenceAlgorithm,
       enumerable: false
     },
+    name: {
+      value: function(patch, text) {
+        return "dmp";
+      }
+    },
     patch: {
       value: function(patch, text) {
         var patchApplied = true;
@@ -70,7 +75,13 @@
       }
     }
   });
+
+  exports.attach = function attach(options) {
+    options.diffAlgorithms.push(new DmpDifferenceAlgorithm());
+  };
   
-  module.exports = DmpDifferenceAlgorithm;
+  exports.init = function (done) {
+    return done();
+  };
   
 }).call(this);
