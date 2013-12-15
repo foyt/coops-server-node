@@ -7,14 +7,25 @@
   var db = mongoose.connection;
   db.on('error', console.error.bind(console, 'connection error:'));
   
+  /* SessionSchema */
+
+  var SessionSchema = mongoose.Schema({
+    userId: mongoose.Schema.Types.ObjectId,
+    clientId: mongoose.Schema.Types.ObjectId,
+    fileId: mongoose.Schema.Types.ObjectId,
+    algorithm: String
+  });
+  
   /* AccessTokenSchema */
   
+  // TODO: Move userId and clientId into SessionSchema
   var AccessTokenSchema = mongoose.Schema({
     token: String,
     refreshToken: String,
     expires: Number,
     userId: mongoose.Schema.Types.ObjectId,
-    clientId: mongoose.Schema.Types.ObjectId
+    clientId: mongoose.Schema.Types.ObjectId,
+    sessionId: mongoose.Schema.Types.ObjectId
   });
   
   /* ClientSchema */
@@ -72,10 +83,11 @@
   
   /* FileRevisionSchema */
   
+  // TODO: Move fileId and userId into SessionSchema
   var FileRevisionSchema = mongoose.Schema({
     fileId: mongoose.Schema.Types.ObjectId,
     userId: mongoose.Schema.Types.ObjectId,
-    clientId: String,
+    sessionId: mongoose.Schema.Types.ObjectId,
     revisionNumber: Number,
     patch: String,
     checksum: String,
@@ -94,7 +106,7 @@
   
   var WebSocketTokenSchema = mongoose.Schema({
     token: String,
-    clientId: String
+    sessionId: mongoose.Schema.Types.ObjectId
   });
   
   module.exports = {
