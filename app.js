@@ -14,6 +14,7 @@ var oauth = require("./oauth");
 var roles = require('./roles.js');
 var auth = require('./auth');
 var websocket = require('./websocket.js');
+var settings = require('./settings');
 
 /**
  * Express setup
@@ -22,21 +23,21 @@ var app = express();
 var unsecureServer = null;
 var secureServer = null;
 
-if (process.env.COOPS_UNSECURE_PORT) {
+if (settings.unsecurePort) {
   unsecureServer = http.createServer(app);
-  unsecureServer.listen(process.env.COOPS_UNSECURE_PORT);
-  console.log("Listening unsecure port " + process.env.COOPS_UNSECURE_PORT);
+  unsecureServer.listen(settings.unsecurePort);
+  console.log("Listening unsecure port " + settings.unsecurePort);
 } 
 
-if (process.env.COOPS_SECURE_PORT && process.env.COOPS_SECURE_CERT && process.env.COOPS_SECURE_CERT_KEY) {
+if (settings.securePort && settings.secureCert && settings.secureCertKey) {
   var certificate = { 
-    key: fs.readFileSync(process.env.COOPS_SECURE_CERT_KEY).toString(), 
-    cert: fs.readFileSync(process.env.COOPS_SECURE_CERT).toString() 
+    key: fs.readFileSync(settings.secureCertKey).toString(), 
+    cert: fs.readFileSync(settings.secureCert).toString() 
   };
 
   secureServer = https.createServer(certificate, app);
-  secureServer.listen(process.env.COOPS_SECURE_PORT);
-  console.log("Listening secure port " + process.env.COOPS_SECURE_PORT);
+  secureServer.listen(settings.securePort);
+  console.log("Listening secure port " + settings.securePort);
 }
 
 app.set('views', __dirname + '/views')

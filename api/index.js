@@ -3,6 +3,7 @@
   // Imports
   
   var diffAlgorithms = require('../diffalgorithms');
+  var settings = require('../settings');
   var async = require('async');
   var db = require("../db");
   var crypto = require('crypto');
@@ -425,13 +426,13 @@
                       clientId: webSocketToken.clientId
                     };
                     
-                    if (process.env.COOPS_UNSECURE_WEBSOCKET == "true") {
-                      var unsecurePort = process.env.COOPS_UNSECURE_WEBSOCKET_PORT || process.env.COOPS_UNSECURE_PORT;
+                    if (settings.unsecureWebSocket) {
+                      var unsecurePort = settings.unsecureWebSocketPort || settings.unsecurePort;
                       response.unsecureWebSocketUrl = 'ws://' + host + ':' + unsecurePort + path;
                     }
       
-                    if (process.env.COOPS_SECURE_WEBSOCKET == "true") {
-                      var securePort = process.env.COOPS_SECURE_WEBSOCKET_PORT || process.env.COOPS_SECURE_PORT;
+                    if (settings.secureWebSocket) {
+                      var securePort = settings.secureWebSocketPort || settings.securePort;
                       response.secureWebSocketUrl = 'wss://' + host + ':' + securePort + path;
                     }
     

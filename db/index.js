@@ -1,7 +1,9 @@
 (function() {
 
   var mongoose = require('mongoose');
-  mongoose.connect(process.env.COOPS_MONGO_SERVER_URI || process.env.MONGOLAB_URI || process.env.MONGOHQ_URL);
+  var settings = require('../settings');
+
+  mongoose.connect(settings.mongoUri);
   var db = mongoose.connection;
   db.on('error', console.error.bind(console, 'connection error:'));
   

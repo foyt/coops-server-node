@@ -5,8 +5,10 @@ var passport = require('passport');
 var BearerStrategy = require('passport-http-bearer').Strategy;
 var BasicStrategy = require('passport-http').BasicStrategy;
 var ClientPasswordStrategy = require('passport-oauth2-client-password').Strategy;
-var db = require('./db');
 var util = require('util');
+
+var db = require('./db');
+var settings = require('./settings');
 
 /**
  * BearerStrategy
@@ -100,7 +102,7 @@ function AdminStrategy(options, verify) {
 util.inherits(AdminStrategy, BasicStrategy);
 
 passport.use(new AdminStrategy(function(username, password, done) {
-  if ((process.env.COOPS_ADMIN_USERNAME == username) && (process.env.COOPS_ADMIN_PASSWORD == password)) {
+  if ((settings.adminUsername == username) && (settings.adminPassword == password)) {
     return done(null, {
       user: 'admin'
     });
