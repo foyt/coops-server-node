@@ -5,6 +5,7 @@
   var diffAlgorithms = new Array();
   
   broadwayApp.use( require("../plugins/dmp"), { diffAlgorithms: diffAlgorithms } );
+  broadwayApp.use( require("../plugins/tosstable"), { diffAlgorithms: diffAlgorithms } );
   
   broadwayApp.init(function (err) {
     if (err) {
