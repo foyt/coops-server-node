@@ -5,12 +5,12 @@
   var diffAlgorithms = require('./diffalgorithms');
   var _ = require('underscore');
 
-  var Client = function (clientId, userId, fileId, revisionNumber, webSocket) {
+  var Client = function (sessionId, userId, fileId, revisionNumber, webSocket) {
     this._userId = userId;
     this._fileId = fileId;
     this._currentRevision = revisionNumber;
     this._webSocket = webSocket;
-    this._clientId = clientId;
+    this._sessionId = sessionId;
     
     var _this = this;
     this._webSocket.on('message', function (data, flags) {
@@ -59,7 +59,7 @@
         this._webSocket.send(JSON.stringify({
           type: 'patch',
           userId: fileRevision.userId,
-          clientId: fileRevision.clientId,
+          sessionId: fileRevision.sessionId,
           patch: fileRevision.patch,
           revisionNumber: fileRevision.revisionNumber,
           checksum: fileRevision.checksum
@@ -157,7 +157,7 @@
           patch: patch, 
           checksum: checksum,
           created: created,
-          clientId: this._clientId
+          sessionId: this._sessionId
         }).save(function (err, fileRevision) {
           callback(err, fileRevision);
         });
@@ -225,7 +225,7 @@
       if (err1) {
         webSocket.close(1011, err1);
       } else if (webSocketToken) {
-        var clientId = webSocketToken.clientId;
+        var sessionId = webSocketToken.sessionId;
         webSocketToken.remove(function (err2) {
           if (err2) {
             webSocket.close(1011, err2);
@@ -234,7 +234,7 @@
               if (err3) {
                 webSocket.close(1011, err3);
               } else {
-                var client = new Client(clientId, userId, fileId, file.revisionNumber, webSocket);
+                var client = new Client(sessionId, userId, fileId, file.revisionNumber, webSocket);
                 console.log("Client connected.");
               }
             });           
