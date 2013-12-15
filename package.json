@@ -21,7 +21,6 @@
     "underscore": "1.4.4",
     "ws": "0.4.25",
     "googlediff": "0.1.0",
-    "crc": "0.2.0",
     "async": "0.2.9",
     "broadway": "*"
   },

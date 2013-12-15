@@ -1,6 +1,5 @@
 (function() {
 
-  var crc = require('crc');
   var WebSocketServer = require('ws').Server;
   var db = require('./db');
   var diffAlgorithms = require('./diffalgorithms');
@@ -176,7 +175,7 @@
             // Unhardcode algorithm
             var patchResult = diffAlgorithms.getAlgorithm('dmp').patch(patch, fileContent.content);
             if (patchResult.applied) {
-              var checksum = crc.crc32(patchResult.patchedText);
+              var checksum = crypto.createHash('md5').update(patchResult.patchedText).digest("hex");
               var patchCreated = new Date();
               // Patch applied succesfully
               var patchedRevision = patchRevision + 1;

@@ -78,7 +78,7 @@
     clientId: String,
     revisionNumber: Number,
     patch: String,
-    checksum: Number,
+    checksum: String,
     created: Date
   });
   

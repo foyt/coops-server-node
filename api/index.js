@@ -7,7 +7,6 @@
   var async = require('async');
   var db = require("../db");
   var crypto = require('crypto');
-  var crc = require('crc');
   var _ = require('underscore');
   
   // Settings
@@ -634,7 +633,7 @@
                     // TODO: Unhardcode algorithm
                     var algorithm = diffAlgorithms.getAlgorithm('dmp');
                     var patch = algorithm.makePatch(fileContent.content, reqBody.content);
-                    var checksum = crc.crc32(reqBody.content);
+                    var checksum = crypto.createHash('md5').update(reqBody.content).digest("hex");
                     
                     var fileRevision = new db.model.FileRevision({ 
                       fileId: file._id, 
@@ -768,7 +767,7 @@
                   userId: userId,
                   revisionNumber: reqBody.revisionNumber, 
                   patch: reqBody.patch, 
-                  checksum: crc.crc32(content),
+                  checksum: crypto.createHash('md5').update(content).digest("hex"),
                   created: now,
                   clientId: -1
                 });
