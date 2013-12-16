@@ -1,9 +1,11 @@
 (function() {
 
   var WebSocketServer = require('ws').Server;
+  var crypto = require('crypto');
+  var _ = require('underscore');
+
   var db = require('./db');
   var diffAlgorithms = require('./diffalgorithms');
-  var _ = require('underscore');
 
   var Client = function (sessionId, userId, fileId, revisionNumber, webSocket) {
     this._userId = userId;
